@@ -1,0 +1,21 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: MACROS.OBJ, MAIN.OBJ
+OUTPUT FILE: MACROS.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  11/23/;6  TIME:  20:39:32
+
+
+LINK MAP OF MODULE MACROS
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 00D5H ------    G    CODE            CODE                          
+ 0000H ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+MACROS.OBJ(MACROS)
+MAIN.OBJ(MAIN)

@@ -1,0 +1,984 @@
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MOTORS
+OBJECT MODULE PLACED IN MOTORS.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MOTORS.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    MOTORS
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   Motors                                   ;
+                             6     ;                                  EE/CS 51                                  ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     
+                            11     ; Overall Description: These are the functions to control the DC motor and laser
+                            12     ; for the Robotrike.
+                            13     
+                            14     ; Table of Contents
+                            15     ; 1)  InitMotors(): initializes variables needed to determine if motors are on
+                            16     ;       or off and run all other functions
+                            17     ; 2)    SetMotorSpeed(speed, angle): sets the speed of the RoboTrike to speed,
+                            18     ;       with 65534 being the full speed; and set the direction of movement to
+                            19     ;       angle in degrees, with 0 degrees being straight ahead.
+                            20     ; 3)    GetMotorSpeed(): gets the current speed setting for the RoboTrike
+                            21     ; 4)    GetMotorDirection(): gets the current direction of movement setting for
+                            22     ;       the RoboTrike
+                            23     ; 5)    SetLaser(onoff): turn on (onoff is true) or turn off (onoff is false) the
+                            24     ;       laser. Onoff is a Boolean variable
+                            25     ; 6)    GetLaser(): get the current laser status (on or off)
+                            26     ; 7)  PWM_Function(): determines whether motor is on/ off based on location
+                            27     ;       in duty cycle
+                            28     
+                            29     ; All shared variables: driveSpeed, driveAngle, laserStatus, pulseWidths[],
+                            30     ; pulseWidthCounter, overallSignal
+                            31     ;
+                            32     ; Revision History:
+                            33     ;    11/11/16  Meera Krishnamoorthy   wrote code
+                            34     
+                            35     
+                            36     CGROUP  GROUP   CODE
+                            37     DGROUP  GROUP   DATA
+                            38     
+                            39     
+----                        40     CODE    SEGMENT PUBLIC 'CODE'
+                            41     
+                            42     
+                            43     ASSUME  CS:CGROUP, DS: DGROUP
+                            44     
+                            45     
+                            46     EXTRN   Sin_Table:WORD       ; table describing sine values
+                            47                                                              ; for all angles from 0 to 3
+                                   56 degrees
+                            48                                                              
+                            49     EXTRN   Cos_Table:WORD       ; table describing cosine values
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            50                                                              ; for all angles from 0 to 3
+                                   56 degrees
+                            51     
+                            52     EXTRN   MotorForcesX_Table:WORD      ; table showing horizontal force
+                            53                                          ; associated with each motor
+                            54                                          
+                            55     EXTRN   MotorForcesY_Table:WORD       ; table showing vertical force
+                            56                                          ; associated with each motor
+                            57     
+                            58     EXTRN   MotorOnOff:BYTE          ; table writing to appropriate bit
+                            59                                                                      ; if motor correspon
+                                   ding to table index
+                            60                                                                      ; is on
+                            61                                                                      
+                            62     EXTRN   MotorDirection:BYTE      ; table writing to appropriate bit
+                            63                                                                      ; if motor correspon
+                                   ding to table index
+                            64                                                                      ; is moving backward
+                                   s
+                            65 +1  $include(motors.inc)
+                      =1    66     ; MOTORS.INC
+                      =1    67     ;
+                      =1    68     ; This is the include file that holds all the constants necessary
+                      =1    69     ; to run the functions in motors.asm, which have to do with turning
+                      =1    70     ; the motors on/ off, and setting the angle/ speed of the motor.
+                      =1    71     
+  0003                =1    72     NUM_MOTORS            EQU     3 ; the number of motors
+  FFFF                =1    73     MAX_SPEED             EQU     65535 ; if this speed is inputted
+                      =1    74                                         ; the robotrike should not change speed
+ -8000                =1    75     MIN_ANGLE             EQU     -32768 ; if this angle is inputted
+                      =1    76                                         ; the robotrike should not change angle
+  0168                =1    77     MAX_ANGLE             EQU     360    ; the upper bound that the angle
+                      =1    78                                          ; stored should be
+  0080                =1    79     MAX_PULSE_WIDTH       EQU     128    ; maximum length of duty cycle counter
+                      =1    80     
+  0001                =1    81     BYTE_TO_WIDTH_CONV    EQU     1   ; amount a number needs to be shifted left
+                      =1    82                                       ; or right to be converted from indexing
+                      =1    83                                       ; a byte table/array to indexing a word
+                      =1    84                                       ; table/ array 
+  0001                =1    85     MOVE_BACKWARDS        EQU     1   ; constant stored that indicates that 
+                      =1    86                                       ; motor is moving backwards (even though
+                      =1    87                                       ; same as BYTE_TO_WIDTH_CONV, can 
+                      =1    88                                       ; change this constant, so have a separate
+                      =1    89                                       ; constant for this)
+  0002                =1    90     NUM_SIGNED_BITS       EQU     2   ; number of signed bits to be removed from
+                      =1    91                                       ; three signed numbers being multiplied
+  0008                =1    92     NUM_BITS              EQU     8   ; number of bits the parallel port receives
+                      =1    93                                       ; from this function
+                      =1    94     
+  0183                =1    95     CONTROL_PORT          EQU     0183H ; address of control port
+  0181                =1    96     MOTOR_PORT            EQU     0181H ; address of port to write to motors
+                      =1    97     
+                      =1    98     
+  0080                =1    99     INIT_SIGNAL           EQU     10000000B ; signal indicating we want B to be output
+                      =1   100                                             ; -- this signal is written to the
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   101                                             ; control port.
+                      =1   102                                             ; also serves as laser output if
+                      =1   103                                             ; laser is on 
+                           104     
+                           105     ; InitMotor
+                           106     ;
+                           107     ; Description: This function initializes all the shared variables used in
+                           108     ;              functions concerning the motors, and also initializes
+                           109     ;              the parallel port. 
+                           110     ;
+                           111     ; Operation: This is done by setting all shared variables created in the
+                           112     ; data segment to zero, including all used elements in the pulseWidths array.
+                           113     ; It also outputs to the control port a value that makes sure that port B
+                           114     ; is an output port so it can be outputted to. 
+                           115     ;
+                           116     ; Arguments: None.
+                           117     ; Return Value: None.
+                           118     ;
+                           119     ; Local Variables: None.
+                           120     ; Shared Variables: 1) driveSpeed, W, type = word, length = 16 bits; driveSpeed
+                           121     ;                    is the variable describing the speed of the RoboTrike,
+                           122     ;                    modified to fit the bounds (0, 65535)
+                           123     ;                   2) driveAngle, W, type = words, length = 16 bits; driveAngle
+                           124     ;                    is the variable describing the direction of the RoboTrike,
+                           125     ;                    modified to fit the bounds (0, 359)
+                           126     ;                   3) laserStatus, W, type = bytes, length = 8 bits; laserStatus
+                           127     ;                    is the variable describing whether the laser is on or
+                           128     ;                    off
+                           129     ;                   4) pulseWidths[], W, type = byte, length = (8 bits) *
+                           130     ;                     NUM_MOTORS; pulseWidths is an array holding the power
+                           131     ;                     delivered to each motor. The index of pulseWidth
+                           132     ;                     corresponds to the motor, and pulseWidth[index]
+                           133     ;                     corresponds to the power delivered to that motor.
+                           134     ;                   5) pulseWidthCounter, W, type = word, length = 16 bits;
+                           135     ;                     pulseWidthCounter is a counter called each time
+                           136     ;                     the PWM Event Handler Function is called --  it keeps
+                           137     ;                     track of how many motor time interrupts have occurred
+                           138     ;                     since the start of the duty cycle, and thus which motors
+                           139     ;                     to turn on and off.
+                           140     ;                   6) overallSignal, W, type = byte, length = 8 bits;
+                           141     ;                     this variable describes the signal sent to the motors
+                           142     ;                     telling them if they are on/ off and the direction
+                           143     ;                     that they are travelling in.
+                           144     ; Global Variables: None.
+                           145     ;
+                           146     ; Input: None.
+                           147     ; Output: None.
+                           148     ;
+                           149     ; Error Handling: None.
+                           150     ;
+                           151     ; Algorithms: None.
+                           152     ; Data Structures: array (pulseWidths[])
+                           153     ;
+                           154     ;
+                           155     ; Registers Changed: None.
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           156     ; Stack Depth: None.
+                           157     ;
+                           158     ; Limitations:
+                           159     ;
+                           160     ; Author: Meera Krishnamoorthy
+                           161     ; Last Modified: 11/11/16
+                           162     ;
+                           163     
+0000                       164     InitMotor      PROC        NEAR
+                           165             PUBLIC      InitMotor
+                           166     
+0000                       167     InitMostVars:
+0000 C70600000000   R      168       MOV driveSpeed, 0 ; initialize driveSpeed variable
+0006 C70602000000   R      169       MOV driveAngle, 0 ; initialize driveAngle variable
+000C C60604000090   R      170       MOV laserStatus, 0 ; initialize laserStatus variable
+0012 C70609000000   R      171       MOV pulseWidthCounter, 0 ; initialize pulseWidthCounter variable
+0018 C6060B000090   R      172       MOV overallSignal, 0 ; initialize overallSignal variable
+                           173     
+001E BA8301                174       MOV DX, CONTROL_PORT ; initial port determining use of ports A, B, C
+0021 B080                  175       MOV AL, INIT_SIGNAL ; initial signal indicating port B should be for
+                           176                                               ; output
+                           177     
+0023 EE                    178       OUT DX, AL ; write initial signal to CONTROL_PORT indicating
+                           179                  ; that port B is an output port
+                           180     
+0024 BB0000                181       MOV BX, 0  ; clear out BX (will be used as an index to access elements
+                           182                  ; in pulseWidths array, starting from the 0th element, so
+                           183                  ; it is necessary for BX to start as 0)
+                           184     
+0027 B80300                185       MOV AX, NUM_MOTORS 
+                           186     
+002A                       187     InitPulseWidthArray:
+002A C68705000090   R      188       MOV pulseWidths[BX], 0 ; initialize BX-th element in pulseWidths array
+0030 43                    189       INC BX
+0031 3BD8                  190       CMP BX, AX
+0033 7EF5                  191       JLE InitPulseWidthArray ; if have not reached end, loop back to continue
+                           192                              ; initializing elements in pulseWidths array
+                           193       ; JGE EndInitMotor ; if have reached end, can return
+                           194     
+0035                       195     EndInitMotor:
+0035 C3                    196       RET
+                           197     
+                           198     InitMotor       ENDP
+                           199     
+                           200     
+                           201     
+                           202     ; SetMotorSpeed
+                           203     ;
+                           204     ; Description: The function is passed 2 arguments. The first argument (speed)
+                           205     ; is passed in AX and is the absolute speed at which the Robotrike is to run.
+                           206     ; A speed of 65535 indicates the current speed should not be changed,
+                           207     ; ignoring the speed argument. The second argument (angle) is passed in BX and
+                           208     ; is the signed angle at which the Robotrike is to move in degrees, with 0
+                           209     ; degrees being straight ahead relative to the RoboTrike orientation.
+                           210     ; An angle of -32768 indicates the current direction of travel should not be
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           211     ; changed, effectively ignoring the angle argument. After it takes in the
+                           212     ; speed and angle, this function calculates the total horizontal and vertical
+                           213     ; power given to each motor based on the fact that the first motor is only
+                           214     ; powered in the horizontal direction, the second and third motors are
+                           215     ; powered in both the horizontal and vertical directions, but more in
+                           216     ; the vertical direction. The force components are in a table.
+                           217     ;
+                           218     ; Operation: This is done by only storing the speed
+                           219     ; arguments if AX != 65535 and only storing the angle argument if BX !=
+                           220     ; -32768. The driveSpeed variable should be between 0 and 65535. 
+                           221     ; This function has to change the passed in angle before storing it in driveAngle.
+                           222     ; The passed in angle (in BX) will be between -32767 and 32767, and driveAngle
+                           223     ; must be between 0 and 359; thus, the angle needs to be normalized. An angle
+                           224     ; of -32768 indicates the current direction of travel should not be changed.
+                           225     ; Thus, that corresponds to an angle of 0. Thus, -32767 corresponds to
+                           226     ; an angle of 1. To change the bounds from (-32767, 32767) to (0, 359), we
+                           227     ; take the MOD of BX with 360, add 360 to that value (in case it's negative),
+                           228     ; and take the MOD of that value again. 
+                           229     ; Then, the function stores AX and the normalized BX in shared variables
+                           230     ; (driveSpeed and driveAngle). After it does this, the function
+                           231     ; calculates the power delivered to each motor. The power is delivered
+                           232     ; to each motor thusly: F1 = [1, 0], F2 = [(-1/2), -sqrt(3)/2],
+                           233     ; F3 = [(1/2), -sqrt(3)/2]. The negative signs indicate the angle of the
+                           234     ; motor from the horizontal/ vertical axis. These values exist
+                           235     ; in a lookup table. 
+                           236     ; The general formula for calculating the power delivered to each motor is
+                           237     ; s_n = F_n_x *  v * cos(theta) + F_n_y * v * sin(theta). We
+                           238     ; get the sin(theta) and cos(theta) values from a lookup table as well. These powers
+                           239     ; are then stored in a shared array (pulseWidths[]), and are used
+                           240     ; in the PWM event handler to determine which motors to turn on and off.
+                           241     
+                           242     ; Arguments: AX (speed), the speed of the RoboTrike before modified to
+                           243     ;             fit bounds (0, 65535)
+                           244     ;            BX (angle), the direction the RoboTrike moves in before modified
+                           245     ;             to fit bounds (0, 359);
+                           246     ;
+                           247     ; Return Value: None.
+                           248     ;
+                           249     ; Local Variables: None.
+                           250     ; Shared Variables: 1) driveSpeed, W, type = word, length = 16 bits; driveSpeed
+                           251     ;                    is the variable describing the speed of the RoboTrike,
+                           252     ;                    modified to fit the bounds (0, 65535). Possible values
+                           253     ;                    of driveSpeed are 0 - 65535.
+                           254     ;                   2) driveAngle, W, type = words, length = 16 bits; driveAngle
+                           255     ;                    is the variable describing the direction of the RoboTrike,
+                           256     ;                    modified to fit the bounds (0, 359). Possible values
+                           257     ;                    of driveAngle are 0 - 359.
+                           258     ;                   3)  pulseWidths[], W, type = byte, length = (8 bits) *
+                           259     ;                     NUM_MOTORS; pulseWidths is an array holding the power
+                           260     ;                     delivered to each motor. The index of pulseWidth
+                           261     ;                     corresponds to the motor, and pulseWidth[index]
+                           262     ;                     corresponds to the power delivered to that motor.
+                           263     ;
+                           264     ; Global Variables: None.
+                           265     ;
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           266     ; Input: None.
+                           267     ; Output: None.
+                           268     ;
+                           269     ; Error Handling: None.
+                           270     ;
+                           271     ; Algorithms: PWM calculation
+                           272     ; Data Structures: Trig_Table, MotorForces_Table, array (pulseWidths[])
+                           273     ;
+                           274     ;
+                           275     ; Registers Changed: None.
+                           276     ; Stack Depth: 2 words
+                           277     ;
+                           278     ; Limitations: None.
+                           279     ;
+                           280     ; Author: Meera Krishnamoorthy
+                           281     ; Last Modified: 11/11/16
+                           282     ;
+                           283     
+0036                       284     SetMotorSpeed      PROC        NEAR
+                           285             PUBLIC      SetMotorSpeed
+                           286     
+0036                       287     SetSpeed: ; speed is stored in AX
+0036 3DFFFF                288       CMP AX, MAX_SPEED ; if speed is equal to MAX_SPEED, should not change
+                           289                         ; driveSpeed, can jump to check if angle should be set.
+0039 7403                  290       JE SetAngle
+003B A30000         R      291       MOV driveSpeed, AX ; if speed != MAX_SPEED, can change value of
+                           292                                              ; shared variable driveSpeed
+                           293     
+                           294     
+003E                       295     SetAngle: ; angle is stored in BX
+003E 81FB0080              296       CMP BX, MIN_ANGLE ; if angle is equal to MAX_ANGLE, should not change
+                           297                         ; speed, can jump to computing pulse widths
+0042 741D                  298       JE InitComputePulseWidths
+                           299     
+0044 8BC3                  300       MOV AX, BX     ; move angle into AX to prepare to make sure it's in bounds
+                           301                                      ; (will need to divide to take MOD and AX is always 
+                                   involved
+                           302                                      ; in divisions)
+0046 BA0000                303       MOV DX, 0      ; initialize DX for division
+0049 99                    304       CWD                    ; further initialize DX for signed division
+004A B96801                305       MOV CX, MAX_ANGLE 
+004D F7F9                  306       IDIV CX ; take the MOD of angle and MAX_ANGLE to ensure that
+                           307                     ; speed is within appropriate bounds// remainder of angle /
+                           308                     ; MAX_ANGLE is stored in DX
+004F 8BC2                  309       MOV AX, DX    
+0051 056801                310       ADD AX, MAX_ANGLE ; (add the maximum value that AX could possibly be
+                           311                                             ; so that we are absolutely sure AX is not < 
+                                   0
+0054 BA0000                312       MOV DX, 0     ; initialize DX for division
+0057 99                    313       CWD                   ; further initialize DX for signed division
+0058 B96801                314       MOV CX, MAX_ANGLE
+005B F7F9                  315       IDIV CX ; take the MOD of angle and MAX_ANGLE to ensure that
+                           316                     ; speed is within appropriate bounds// remainder of angle /
+                           317                     ; MAX_ANGLE is stored in DX
+005D 89160200       R      318       MOV driveAngle, DX ; store this normalized angle in the shared variable
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           319                                              ; driveAngle
+                           320     
+                           321     
+0061                       322     InitComputePulseWidths:
+0061 BB0000                323        MOV BX, 0 ; initializing index used to access elements of pulseWidths array
+                           324                  ; indicates the motor that we are looking at
+                           325     
+0064                       326     HorizontalForce:
+0064 53                    327       PUSH BX ; save index used to access elements of pulseWidths array
+                           328       
+0065 D1E3                  329       SHL BX, BYTE_TO_WIDTH_CONV ; multiplies BX by 2*BYTE_TO_WIDTH_CONV
+                           330                                                              ; because need to access val
+                                   ue in 
+                           331                                                              ; table below that correspon
+                                   ds to current
+                           332                                                              ; motor we are looking at, w
+                                   hich is the index
+                           333                                                              ; of the pulseWidths array. 
+                                   however, this array
+                           334                                                              ; is in bytes and the table 
+                                   is words. to convert
+                           335                                                              ; the index to access the wo
+                                   rd table, we
+                           336                                                              ; shift the index register r
+                                   ight, which
+                           337                                                              ; multiplies the index by 2*
+                                   BYTE_TO_WIDTH_CONV
+                           338         
+0067 2E8B8F0000     E      339       MOV CX, CS:MotorForcesX_Table[BX] ; get horizontal force component of motor
+                           340     
+006C 8B1E0200       R      341       MOV BX, driveAngle ; set driveAngle as key to look up in next table
+0070 D1E3                  342       SHL BX, BYTE_TO_WIDTH_CONV ; multiplies driveAngle by 2*BYTE_TO_WIDTH_CONV
+                           343                                                              ; for same reason as above (
+                                   want to search
+                           344                                                              ; in word table). 
+                           345       
+0072 2E8B870000     E      346       MOV AX, CS:Cos_Table[BX] ; get cos(driveAngle)
+                           347       
+0077 F7E9                  348       IMUL CX ; multiply AX (cos(driveAngle)) by CX (force value) to get 
+                           349               ; horizontal force
+                           350                       
+0079 8BC2                  351       MOV AX, DX ; the most significant bits of this multiplication is stored in
+                           352                              ; in DX, so take DX and store it in AX (where we will be sto
+                                   ring
+                           353                              ; the horizontal force value)
+                           354       
+007B                       355     VerticalForce:
+007B 5B                    356       POP BX ; get saved pulseWidth array index (current motor we are looking at)
+007C 50                    357       PUSH AX ; store value of horizontal force
+007D 53                    358       PUSH BX ; save index value before shifting it
+007E D1E3                  359       SHL BX, BYTE_TO_WIDTH_CONV ; multiplies BX by 2*BYTE_TO_WIDTH_CONV
+                           360                                                              ; for same reason as above (
+                                   want to search
+                           361                                                              ; in word table). 
+                           362     
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0080 2E8B8F0000     E      363       MOV CX, CS:MotorForcesY_Table[BX] ; get vertical force component of motor
+                           364     
+0085 8B1E0200       R      365       MOV BX, driveAngle ; set driveAngle as key to look up in next table
+0089 D1E3                  366       SHL BX, BYTE_TO_WIDTH_CONV ; multiplies driveAngle by 2*BYTE_TO_WIDTH_CONV
+                           367                                                              ; for same reason as above (
+                                   want to search
+                           368                                                              ; in word table). 
+                           369      
+008B 2E8B870000     E      370       MOV AX, CS:Sin_Table[BX] ; get sin(driveAngle)
+                           371         
+0090 F7E9                  372       IMUL CX ; multiply AX (sin(driveAngle)) by CX (force value) to get 
+                           373               ; vertical force
+0092 8BCA                  374       MOV CX, DX ; the most significant bits of this multiplication is stored in
+                           375                              ; in DX, so take DX and store it in CX (where we will be sto
+                                   ring
+                           376                              ; the vertical force value)
+                           377       
+0094                       378     ForceToPulseWidth:
+0094 5B                    379       POP BX ; get saved pulseWidth array index (current motor we are looking at)
+0095 58                    380       POP AX ; get horizontal power component
+0096 03C8                  381       ADD CX, AX ; add horizontal and vertical force components
+                           382       
+0098 A10000         R      383       MOV AX, driveSpeed ; move driveSpeed into register to prepare to 
+                           384                                              ; multiply it to force values
+009B D1E8                  385       SHR AX, 1                              ; scale speed down so will be positive
+                           386                                                              ; current speed bounds = (0,
+                                    65535). by shifting
+                           387                                                              ; this value by 1, we are di
+                                   viding this value by
+                           388                                                              ; 2, to change the bounds to
+                                    (0, 32767)
+                           389       
+009D F7E9                  390       IMUL CX ; multiply total force by speed to get pulseWidth(power associated 
+                           391                       ; with motor)
+009F C1E202                392       SHL DX, NUM_SIGNED_BITS ; the most significant bits of this multiplication 
+                           393                                                       ; is stored in DX. DX is the result
+                                    of three
+                           394                                                       ; multiplied values, so it has thre
+                                   e signed bits.
+                           395                                                       ; We want to get rid of NUM_SIGNED_
+                                   BITS of these
+                           396                                                       ; signed bits, and leave one remain
+                                   ing, so we
+                           397                                                       ; shift DX by NUM_SIGNED_BITS so th
+                                   at the value
+                           398                                                       ; only has 1 signed bit. This remai
+                                   ning signed bit
+                           399                                                       ; will be used to determine if the 
+                                   motor is moving
+                           400                                                       ; forwards or backwards
+                           401                                                       
+00A2 88B70500       R      402       MOV pulseWidths[BX], DH ; set pulseWidth of motor BX to DH (most 
+                           403                                                       ; significant part of DH)
+                           404     
+00A6                       405     ContinueComputation:
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00A6 B80300                406       MOV AX, NUM_MOTORS ; set AX to maximum number of values that should be
+                           407                                              ; in pulseWidths array
+00A9 43                    408       INC BX; increment index (to increment BX+1-th element in pulseWidths
+                           409              ; array in next loop)
+00AA 3BD8                  410       CMP BX, AX ; check if have reached end of array (are NUM_MOTORS
+                           411                              ; elements in the pulseWidths array)
+00AC 7CB6                  412       JL HorizontalForce ; if have not reached end, loop back to continue
+                           413                              ; calculating pulse widths of motors
+                           414       ; JGE EndSetMotorSpeed ; if have reached end, can return
+                           415     
+00AE                       416     EndSetMotorSpeed:
+00AE C3                    417       RET
+                           418     
+                           419     SetMotorSpeed   ENDP
+                           420     
+                           421     
+                           422     ; GetMotorSpeed
+                           423     ;
+                           424     ; Description: The function is called with no arguments and returns the current
+                           425     ; speed setting for the RoboTrike in AX. A speed of 65534 indicates
+                           426     ; maximum speed and a value of 0 indicates the RoboTrike is stopped.
+                           427     ; The value returned will always be between 0 and 65534.
+                           428     ;
+                           429     ; Operation: This is done by storing the shared variable driveSpeed in AX.
+                           430     ;
+                           431     ;
+                           432     ; Arguments: None.
+                           433     ; Return Value: AX, register that holds the speed of the RoboTrike
+                           434     ;
+                           435     ; Local Variables: None.
+                           436     ; Shared Variables: 1) driveSpeed, W, type = word, length = 16 bits; driveSpeed
+                           437     ;                    is the variable describing the speed of the RoboTrike,
+                           438     ;                    modified to fit the bounds (0, 65535)
+                           439     ; Global Variables: None.
+                           440     ;
+                           441     ; Input: None.
+                           442     ; Output: None.
+                           443     ;
+                           444     ; Error Handling: None.
+                           445     ;
+                           446     ; Algorithms: None.
+                           447     ; Data Structures:
+                           448     ;
+                           449     ;
+                           450     ; Registers Changed: None.
+                           451     ; Stack Depth: None.
+                           452     ;
+                           453     ; Limitations: None.
+                           454     ;
+                           455     ; Author: Meera Krishnamoorthy
+                           456     ; Last Modified: 11/11/16
+                           457     ;
+                           458     
+00AF                       459     GetMotorSpeed      PROC        NEAR
+                           460             PUBLIC      GetMotorSpeed
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           461     
+00AF A10000         R      462     MOV AX, driveSpeed ; get stored speed of motor and store in AX
+00B2 C3                    463     RET
+                           464     
+                           465     GetMotorSpeed   ENDP
+                           466     
+                           467     
+                           468     ; GetMotorDirection
+                           469     ;
+                           470     ; Description: The function is called with no arguments and returns the current
+                           471     ; direction of movement setting for the RoboTrike as an angle in degrees in
+                           472     ; AX. An angle of 0 indicates straight ahead relative to the RoboTrike
+                           473     ; orientation. Angles are measured clockwise. The value returned will always
+                           474     ; be 0 and 359 inclusively.
+                           475     ;
+                           476     ; Operation: This is done by storing the shared variable
+                           477     ; driveAngle in AX.
+                           478     ;
+                           479     ; Arguments: None.
+                           480     ; Return Value: AX, register that holds the angle of the RoboTrike
+                           481     ;
+                           482     ; Local Variables: None.
+                           483     ; Shared Variables: 1) driveAngle, W, type = words, length = 16 bits; driveAngle
+                           484     ;                    is the variable describing the direction of the RoboTrike,
+                           485     ;                    modified to fit the bounds (0, 359)
+                           486     ; Global Variables: None.
+                           487     ;
+                           488     ; Input: None.
+                           489     ; Output: None.
+                           490     ;
+                           491     ; Error Handling: None.
+                           492     ;
+                           493     ; Algorithms: None.
+                           494     ; Data Structures:
+                           495     ;
+                           496     ;
+                           497     ; Registers Changed: None.
+                           498     ; Stack Depth: None.
+                           499     ;
+                           500     ; Limitations: None.
+                           501     ;
+                           502     ; Author: Meera Krishnamoorthy
+                           503     ; Last Modified: 11/11/16
+                           504     ;
+                           505     
+00B3                       506     GetMotorDirection      PROC        NEAR
+                           507             PUBLIC      GetMotorDirection
+                           508     
+00B3 A10200         R      509     MOV AX, driveAngle ; get stored angle of motors' travel and store in AX
+00B6 C3                    510     RET
+                           511     
+                           512     GetMotorDirection       ENDP
+                           513     
+                           514     
+                           515     ; SetLaser
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           516     ;
+                           517     ; Description: This function is passed a single argument (onoff) in AX that
+                           518     ; indicates whether to turn the RoboTrike laser on or off. A zero value turns
+                           519     ; the laser off and a non zero value turns it on.
+                           520     ;
+                           521     ; Operation: This is done by storing the value of AX in a shared variable
+                           522     ; laserStatus. This variable is 0 if the laser should be off and nonzero if the
+                           523     ; laser should be on.
+                           524     ;
+                           525     ; Arguments: AX, register that holds the onoff argument to determine whether
+                           526     ;            the laser should be on or off.
+                           527     ; Return Value: None.
+                           528     ;
+                           529     ; Local Variables: None.
+                           530     ; Shared Variables: 1) laserStatus, W, type = bytes, length = 8 bits; laserStatus
+                           531     ;                    is the variable describing whether the laser is on or
+                           532     ;                    off
+                           533     ; Global Variables: None.
+                           534     ;
+                           535     ; Input: None.
+                           536     ; Output: None.
+                           537     ;
+                           538     ; Error Handling: None.
+                           539     ;
+                           540     ; Algorithms: None.
+                           541     ; Data Structures: None.
+                           542     ;
+                           543     ;set
+                           544     ; Registers Changed: None.
+                           545     ; Stack Depth: None.
+                           546     ;
+                           547     ; Limitations: None.
+                           548     ;
+                           549     ; Author: Meera Krishnamoorthy
+                           550     ; Last Modified: 11/11/16
+                           551     ;
+                           552     
+00B7                       553     SetLaser      PROC        NEAR
+                           554             PUBLIC      SetLaser
+                           555     
+00B7 3D0000                556     CMP AX, 0 ; check if laser status is 0 (if it is, laser should be off)
+00BA 7409                  557     JE OffLaser ; turn laser off
+00BC C60604000190   R      558     MOV laserStatus, 1 ; move nonzero value into laserStatus if laser should be on
+00C2 EB0490                559     JMP EndSetLaserStatus
+                           560     
+00C5                       561     OffLaser:
+00C5 A20400         R      562         MOV laserStatus, AL ; set value of laserStatus (which determines whether
+                           563                             ; the laser should be on or off) to whatever is in
+                           564                             ; AL. 
+                           565     
+00C8                       566     EndSetLaserStatus:
+00C8 C3                    567             RET
+                           568     
+                           569     SetLaser        ENDP
+                           570     
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           571     
+                           572     ; GetLaser
+                           573     ;
+                           574     ; Description: The function is called with no arguments and returns the status
+                           575     ; of the RoboTrike laser in AX. A value of 0 indicates the laser is off and a
+                           576     ; non zero value indicates that the laser is on.
+                           577     ;
+                           578     ; Operation: This is done by setting AX equal to the value of the shared
+                           579     ; variable laserStatus (which is 0 if the laser is off and 1 if the laser is
+                           580     ; on).
+                           581     ;
+                           582     ; Arguments: None.
+                           583     ; Return Value: AX, register that holds the value to determine whether
+                           584     ;            the laser should be on or off.
+                           585     ;
+                           586     ; Local Variables: None.
+                           587     ; Shared Variables: 1) laserStatus, W, type = bytes, length = 8 bits; laserStatus
+                           588     ;                    is the variable describing whether the laser is on or
+                           589     ;                    off
+                           590     ; Global Variables: None.
+                           591     ;
+                           592     ; Input: None.
+                           593     ; Output: None.
+                           594     ;
+                           595     ; Error Handling: None.
+                           596     ;
+                           597     ; Algorithms: None.
+                           598     ; Data Structures: None.
+                           599     ;
+                           600     ;
+                           601     ; Registers Changed: None.
+                           602     ; Stack Depth: None.
+                           603     ;
+                           604     ; Limitations: None.
+                           605     ;
+                           606     ; Author: Meera Krishnamoorthy
+                           607     ; Last Modified: 11/11/16
+                           608     ;
+                           609     
+00C9                       610     GetLaser      PROC        NEAR
+                           611             PUBLIC      GetLaser
+                           612             
+00C9 B80000                613     MOV AX, 0 ; laserStatus is a byte, so we only move laserStatus into AL.
+                           614                       ; however, we don't want AH to be something random, so we
+                           615                       ; initialize all of AX to 0. 
+00CC A00400         R      616     MOV AL, laserStatus ; move value of laserStatus into AL (laserStatus
+                           617                                             ; describes if the laser is on or off)
+00CF C3                    618     RET
+                           619     
+                           620     GetLaser        ENDP
+                           621     
+                           622     
+                           623     ; PWM_Function
+                           624     ;
+                           625     ; Description: This function determines which motors should be turned on
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           626     ; and off based on the value of the pulseWidthCounter, which starts at 0
+                           627     ; and is incremented each time this function is called. PulseWidthCounter determines
+                           628     ; where in the duty cycle we are. If the motor's pulse width (which
+                           629     ; is calculated in setMotorSpeed) is greater than the pulseWidthCounter,
+                           630     ; that motor is on. If it's not, that motor is off. This function also deter-
+                           631     ; mines the direction in which a motor should travel if it's on -- the
+                           632     ; direction the motor travels is determined by the value of its pulse width.
+                           633     ; If the pulse width is negative, the motor is travelling backwards, and if
+                           634     ; it's positive, the motor is moving forward. An overall signal (in
+                           635     ; the shared variable overallSignal) is sent
+                           636     ; to the motors at the end of the function telling each motor if it's on
+                           637     ; or off, and if it's on or off, what direction it is travelling in. This signal
+                           638     ; also contains information related to the laser, specifically, a bit that
+                           639     ; is set if the laser is on or off. 
+                           640     
+                           641     ; Operation: This is done by comparing the pulse widths
+                           642     ; of each motor (stored in the shared variable pulseWidths) 0. If the 
+                           643     ; value is less than 0, then that motor should be moving backwards 
+                           644     ; if it is on. To determine if its on, we negate the value of the pulse
+                           645     ; width if it is negative, and compare the pulse widths to the pulse width
+                           646     ; counter shared variable. If the pulse width of the motor is greater
+                           647     ; than the pulseWidthCounter, that motor is on. We can then send a signal
+                           648     ; to that motor (determined by bit patterns in look up tables MotorOnOff
+                           649     ; and MotorDirection) telling it if it is on, and if it is on, what 
+                           650     ; direction it is travelling in. Each motor corresponds to two bits; one 
+                           651     ; bit determines whether it is on or off, and the other determines the direction.
+                           652     ; The direction bit should only be set if the motor on bit is set. 
+                           653     ; After the bit pattern have been determined for all three motors, 
+                           654     ; a bit pattern is added to the overall bit pattern to indicate whether 
+                           655     ; the laser should be on or off. 
+                           656     ;
+                           657     ; Arguments: None.
+                           658     ; Return Value: None.
+                           659     ;
+                           660     ; Local Variables: OverallSignal
+                           661     ; Shared Variables: 1) pulseWidths[], W, type = byte, length = (8 bits) *
+                           662     ;                     NUM_MOTORS; pulseWidths is an array holding the power
+                           663     ;                     delivered to each motor. The index of pulseWidth
+                           664     ;                     corresponds to the motor, and pulseWidth[index]
+                           665     ;                     corresponds to the power delivered to that motor.
+                           666     ;                   2) pulseWidthCounter, W, type = word, length = 16 bits;
+                           667     ;                     pulseWidthCounter is a counter called each time
+                           668     ;                     the PWM Event Handler Function is called --  it keeps
+                           669     ;                     track of how many motor time interrupts have occurred
+                           670     ;                     since the start of the duty cycle, and thus which motors
+                           671     ;                     to turn on and off.
+                           672     ;                   3) overallSignal, W, type = byte, length = 8 bits;
+                           673     ;                     this variable describes the signal sent to the motors
+                           674     ;                     telling them if they are on/ off and the direction
+                           675     ;                     that they are travelling in.
+                           676     ; Global Variables: None.
+                           677     ;
+                           678     ; Input: None.
+                           679     ; Output: Parallel ports (to motors/ lasers)
+                           680     ;
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   14
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           681     ; Error Handling: None.
+                           682     ;
+                           683     ; Algorithms: None.
+                           684     ; Data Structures:
+                           685     ;
+                           686     ;
+                           687     ; Registers Changed: None.
+                           688     ; Stack Depth: None.
+                           689     ;
+                           690     ; Limitations: None.
+                           691     ;
+                           692     ; Author: Meera Krishnamoorthy
+                           693     ; Last Modified: 11/11/16
+                           694     
+00D0                       695     PWM_Function      PROC        NEAR
+                           696             PUBLIC      PWM_Function
+                           697     
+00D0                       698     InitPWM:
+00D0 BB0000                699        MOV BX, 0 ; initializing index used to access elements of pulseWidths array
+                           700                  ; indicates the motor that we are looking at
+00D3 C6060B000090   R      701        MOV overallSignal, 0 ; initialize variable that will hold signal to send to
+                           702                                                      ; parallel ports at end of function
+                           703     
+00D9                       704     Direction:
+00D9 BA0000                705       MOV DX, 0 ; clear DX (saving values to register later)
+00DC 53                    706       PUSH BX ; save value of index while performing all these functions
+00DD B80000                707       MOV AX, 0 ; initialize variable used to store pulsewidth (since pulsewidth
+                           708                             ; is a byte array)
+00E0 8A870500       R      709       MOV AL, pulseWidths[BX] ; move pulsewidth array value to AL
+                           710                                                       ; so that if it needs to be negated
+                           711                                                       ; before its comparison with pulseW
+                                   idthCounter
+                           712                                                       ; (if it's negative), it can be 
+                           713                                                       ; without changing the original pul
+                                   seWidths value
+00E4 3C00                  714       CMP AL, 0; compare pulsewidth to 0
+00E6 7D05                  715       JGE CheckMotorStatus ; determine if pulsewidth value is negative, and therefore,
+                           716                             ; if motor associated with pulsewidth is moving backwards
+                           717                             ; if not negative, can move on
+00E8 BA0100                718       MOV DX, MOVE_BACKWARDS ; if is negative, set DX to MOVE_BACKWARDS value
+                           719                                                      ; this DX register will continue to 
+                                   store 
+                           720                                                      ; this value which indicates the mot
+                                   or should
+                           721                                                      ; move backwards until the signal in
+                                   dicating
+                           722                                                      ; direction of motor is outputted
+00EB F6D8                  723       NEG AL ; negate value of pulseWidth so it can be compared to the 
+                           724                      ; pulseWidthCounter
+                           725     
+00ED                       726     CheckMotorStatus: 
+00ED 3B060900       R      727       CMP AX, pulseWidthCounter ; compares pulseWidth with pulseWidthCounter
+00F1 7E1F                  728       JLE WrapPulseWidthCounter ; if absolute value of pulseWidth is less than
+                           729                                                             ; or equal to pulseWidthCount
+                                   er, motor is off
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   15
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           730                                                             ; else, motor is ON
+                           731        
+00F3 5B                    732       POP BX ; get pulseWidth array index (indicates which motor looking at)
+00F4 8BC3                  733       MOV AX, BX ; put index into AX to prepare for table look up in XLAT 
+                           734                              ; (which uses AL and BX)
+                           735       
+00F6 53                    736       PUSH BX ; save pulseWidth index because BX will be used to hold table
+                           737                       ; address
+                           738       
+00F7 BB0000         E      739       MOV BX, offset(MotorOnOff) ; store the table holding bit patterns
+                           740                                                              ; that indicate what bit sho
+                                   uld be 
+                           741                                                              ; written to if the motor is
+                                    on
+                           742                                                              ; in BX 
+00FA 2ED7                  743       XLAT CS:MotorOnOff ; looks up value to write to overall signal
+                           744                                              ; that indicates that current motor is on
+00FC 08060B00       R      745       OR overallSignal, AL  ; adds this value to overall signal
+                           746                                                     ; use OR because only want to add bit
+                                   , not 
+                           747                                                     ; subtract anything from signal
+                           748       
+0100 5B                    749       POP BX ; get pulseWidth array index (indicates which motor looking at)
+0101 8BC3                  750       MOV AX, BX ; put index into AX to prepare for table look up in XLAT 
+                           751                              ; (which uses AL and BX)
+0103 53                    752       PUSH BX ; save pulseWidth index because BX will be used to hold table
+                           753                       ; address
+                           754       
+0104 83FA01                755       CMP DX, MOVE_BACKWARDS ; compare DX register with value indicating
+                           756                                                      ; motor is moving backwards (which i
+                                   t would be
+                           757                                                      ; set to if pulseWidth was negative)
+0107 7509                  758       JNE WrapPulseWidthCounter ; if not negative, move on
+                           759       
+                           760       ; if negative, add bit pattern to overall signal to indicate
+0109 BB0000         E      761       MOV BX, offset(MotorDirection) ; store the table holding bit patterns
+                           762                                                              ; that indicate what bit sho
+                                   uld be 
+                           763                                                              ; written to if the motor is
+                                    moving backwards
+                           764                                                              ; in BX 
+010C 2ED7                  765       XLAT CS:MotorDirection ; looks up value to write to overall signal
+                           766                                              ; that indicates that current motor is movin
+                                   g backwards
+010E 08060B00       R      767       OR overallSignal, AL  ; adds this value to overall signal
+                           768                                                     ; use OR because only want to add bit
+                                   , not 
+                           769                                                     ; subtract anything from signal
+                           770       
+0112                       771     WrapPulseWidthCounter:
+0112 FF060900       R      772       INC pulseWidthCounter ; pulseWidthCounter is incremented each iteration
+                           773                                                     ; of function (keeps track of locatio
+                                   n in duty
+                           774                                                     ; cycle)
+0116 813E09008000   R      775       CMP pulseWidthCounter, MAX_PULSE_WIDTH  ; check if have reached end of duty
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   16
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           776                                               ; cycle (where pulseWidthCounter =
+                           777                                               ; MAX_PULSE_WIDTH)
+011C 7C06                  778       JL ContinuePWM ; if we have not, continue
+011E C70609000000   R      779       MOV pulseWidthCounter, 0 ; if we have, set pulseWidthCounter to 0 again
+                           780                                ; (for wrapping purposes)
+                           781     
+0124                       782     ContinuePWM:
+0124 B80300                783       MOV AX, NUM_MOTORS ; set AX to maximum number of values that should be
+                           784                                              ; in pulseWidths array
+0127 5B                    785       POP BX
+                           786       
+0128 83C301                787       ADD BX, 1 ; increment index (to increment BX+1-th element in pulseWidths
+                           788              ; array in next loop)
+012B 3BD8                  789       CMP BX, AX ; check if have reached end of array (are NUM_MOTORS
+                           790                              ; elements in the pulseWidths array)
+012D 7CAA                  791       JL Direction ; if have not reached end, continue looping to determine
+                           792                                ; what to add to overallSignal to represent each motor.
+                           793       ; JGE EndPWM ; if have reached end, can return
+                           794     
+012F                       795     AddLaser: ; add bit to describe laser's status to overallSignal
+012F 803E040000     R      796       CMP laserStatus, 0 ; if laserStatus is zeroed, laser is off, move on
+0134 7409                  797       JE NoLaser ; check to see if laser is working
+0136 800E0B008090   R      798       OR overallSignal, INIT_SIGNAL ; if laser is on, add INIT_SIGNAL to
+                           799                                                                     ; overall signal to i
+                                   ndicate this       
+013C EB0790                800       JMP SendSignal
+                           801       
+013F                       802     NoLaser:
+013F 80260B007F90   R      803       AND overallSignal, 01111111B ; (make sure that top bit is 0 --> that
+                           804                                                                ; represents the laser's s
+                                   tatus)
+                           805             
+0145                       806     SendSignal:
+0145 A00B00         R      807       MOV AL, overallSignal
+0148 BA8101                808       MOV DX, MOTOR_PORT
+014B EE                    809       OUT DX, AL ; out uses DX and AL. DX holds address to write to (MOTOR_PORT),
+                           810                              ; and AL holds value of signal to write to motor port
+                           811     
+014C                       812     EndPWM: 
+014C C3                    813       RET
+                           814     
+                           815     PWM_Function    ENDP
+                           816     
+                           817     
+----                       818     CODE    ENDS
+                           819     
+                           820     
+                           821     ;the data segment
+                           822     
+----                       823     DATA    SEGMENT PUBLIC  'DATA'
+                           824     
+0000 ????                  825     driveSpeed          DW      ?   ; overall speed of RoboTrike
+0002 ????                  826     driveAngle          DW      ?   ; overall direction RoboTrike is travelling in
+                           827     
+0004 ??                    828     laserStatus         DB      ?   ; whether laser is on or off
+8086/87/88/186 MACRO ASSEMBLER    MOTORS                                                   19:31:12  12/03/;6  PAGE   17
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           829     
+                           830     ; an array that contains the power delivered to each motor
+0005 (4                    831     pulseWidths         DB  (NUM_MOTORS + 1)  DUP (?)
+     ??
+     )
+                           832     
+0009 ????                  833     pulseWidthCounter   DW      ?   ; counter that  keeps track of how many motor
+                           834                                     ; time interrupts have occurred
+                           835                                     ; since the start of the duty cycle
+000B ??                    836     overallSignal       DB    ?     ; signal telling the motors if they are
+                           837                                     ; on and off, and if they are, what
+                           838                                     ; direction they're travelling in
+                           839     
+----                       840     DATA    ENDS
+                           841     
+                           842     
+                           843     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

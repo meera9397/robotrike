@@ -1,0 +1,260 @@
+8086/87/88/186 MACRO ASSEMBLER    EH_TI                                                    23:10:14  11/05/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE EH_TI
+OBJECT MODULE PLACED IN EH_TI.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE EH_TI.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1            NAME  EH_TI
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                    EH_TI                                   ;
+                             5     ;                     Event Handler/ Timer related functions                 ;
+                             6     ;                 used to display strings/ numbers on a display              ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; Description:      This program contains the event handler for the 
+                            10     ;                   display functions and leypad functions
+                            11     ; Table of Contents:
+                            12     ; 1) TimerEventHandler: calls MuxSegPatterns (function that outputs segment
+                            13     ;                       patterns corresponding to a string/number to
+                            14     ;                       the display) and sends an EOI to the event handler when
+                            15     ;                       done. 
+                            16     ;
+                            17     ; Revision History:
+                            18     ;      10/30/16  Meera Krishnamoorthy   used functions written by Glen George
+                            19     ;                                       to use for event handling/ timers
+                            20     
+                            21     
+                            22     ; local include files
+                            23 +1  $INCLUDE(EH_TI.INC)
+                      =1    24     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    25     ;                                                                            ;
+                      =1    26     ;                                  EH_TI.INC                                ;
+                      =1    27     ;                              Event Handler Demo                            ;
+                      =1    28     ;                                 Include File                               ;
+                      =1    29     ;                                                                            ;
+                      =1    30     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    31     
+                      =1    32     ; This file contains the definitions for the Event Handler Demonstration
+                      =1    33     ; program (EH_TI.ASM).
+                      =1    34     ;
+                      =1    35     ; Revision History:
+                      =1    36     ;    11/11/92  Glen George      initial revision (originally part of
+                      =1    37     ;                                  ISRDEMO.ASM)
+                      =1    38     ;    10/27/93  Glen George      split definitions into own file (EH_TI.INC)
+                      =1    39     ;                               updated/corrected comments
+                      =1    40     ;    10/24/94  Glen George      added Revision History section
+                      =1    41     ;                               updated comments
+                      =1    42     ;    10/25/95  Glen George      updated comments
+                      =1    43     ;    10/28/96  Glen George      added COUNTS_PER_MS and MS_PER_SEG constants
+                      =1    44     ;                               updated comments
+                      =1    45     ;    10/28/97  Glen George      added RESERVED_VECS constant
+                      =1    46     ;                               changed PACSVal and MPCSVal to not set
+                      =1    47     ;                                  reserved bits and set 3 wait states
+                      =1    48     ;                               updated comments
+                      =1    49     ;    12/26/99  Glen George      updated comments
+                      =1    50     ;     2/13/01  Glen George      changed MPCSVAL to a legal value
+8086/87/88/186 MACRO ASSEMBLER    EH_TI                                                    23:10:14  11/05/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;     2/03/03  Glen George      changed NO_DIGITS to NUM_DIGITS
+                      =1    52     ;                               changed Timer0EOI to TimerEOI
+                      =1    53     ;                               added NUM_IRQ_VECTORS
+                      =1    54     ;                               updated comments
+                      =1    55     ;     1/28/04  Glen George      updated comments
+                      =1    56     ;     2/05/05  Glen George      added FIRST_RESERVED_VEC and LAST_RESERVED_VEC
+                      =1    57     ;                                  and removed RESERVED_VECS for new version
+                      =1    58     ;                                  of ClrIRQVectors
+                      =1    59     ;                               updated comments
+                      =1    60     
+                      =1    61     
+                      =1    62     
+                      =1    63     ; Timer Definitions
+                      =1    64     
+                      =1    65     ; Addresses
+  FF56                =1    66     Tmr0Ctrl        EQU     0FF56H          ;address of Timer 0 Control Register
+  FF52                =1    67     Tmr0MaxCntA     EQU     0FF52H          ;address of Timer 0 Max Count A Register
+  FF50                =1    68     Tmr0Count       EQU     0FF50H          ;address of Timer 0 Count Register
+                      =1    69     
+                      =1    70     ; Control Register Values
+  E001                =1    71     Tmr0CtrlVal     EQU     0E001H          ;value to write to Timer 0 Control Register
+                      =1    72                                             ;1---------------  enable timer
+                      =1    73                                             ;-1--------------  write to control
+                      =1    74                                             ;--1-------------  enable interrupts
+                      =1    75                                             ;----000000------  reserved
+                      =1    76                                             ;---0------0-----  read only
+                      =1    77                                             ;-----------0----  TMRIN0 is an enable
+                      =1    78                                             ;------------00--  count timer 2 outs
+                      =1    79                                             ;--------------0-  single counter mode
+                      =1    80                                             ;---------------1  continuous mode
+  C001                =1    81     Tmr2CtrlVal     EQU     0C001H          ;value to write to Timer 2 Control Register
+                      =1    82                                             ;1---------------  enable timer
+                      =1    83                                             ;-1--------------  write to control
+                      =1    84                                             ;--0-------------  no interrupts
+                      =1    85                                             ;----000000-0000-  reserved
+                      =1    86                                             ;---0------0-----  read only
+                      =1    87                                             ;---------------1  continuous mode
+                      =1    88     
+                      =1    89     ; Interrupt Vectors
+  0008                =1    90     Tmr0Vec         EQU     8               ;interrupt vector for Timer 0
+                      =1    91     
+                      =1    92     
+                      =1    93     ; Interrupt Controller Definitions
+                      =1    94     
+                      =1    95     ; Addresses
+  FF32                =1    96     INTCtrlrCtrl    EQU     0FF32H          ;address of interrupt controller for timer
+  FF22                =1    97     INTCtrlrEOI     EQU     0FF22H          ;address of interrupt controller EOI register
+                      =1    98     
+                      =1    99     ; Register Values
+  0001                =1   100     INTCtrlrCVal    EQU     00001H          ;set priority for timers to 1 and enable
+                      =1   101                                             ;000000000000----  reserved
+                      =1   102                                             ;------------0---  enable timer interrupt
+                      =1   103                                             ;-------------001  timer priority
+  0008                =1   104     TimerEOI        EQU     00008H          ;Timer EOI command (same for all timers)
+  8000                =1   105     NonSpecEOI      EQU     08000H          ;Non-specific EOI command
+8086/87/88/186 MACRO ASSEMBLER    EH_TI                                                    23:10:14  11/05/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   106     
+                      =1   107     
+                      =1   108     ; Chip Select Unit Definitions
+                      =1   109     
+                      =1   110     ; Addresses
+  FFA4                =1   111     PACSreg         EQU     0FFA4H          ;address of PACS register
+  FFA8                =1   112     MPCSreg         EQU     0FFA8H          ;address of MPCS register
+                      =1   113     
+                      =1   114     ; Control Register Values
+  0003                =1   115     PACSval         EQU     00003H          ;PCS base at 0, 3 wait states
+                      =1   116                                             ;0000000000------  starts at address 0
+                      =1   117                                             ;----------000---  reserved
+                      =1   118                                             ;-------------0--  wait for RDY inputs
+                      =1   119                                             ;--------------11  3 wait states
+  0183                =1   120     MPCSval         EQU     00183H          ;PCS in I/O space, use PCS5/6, 3 wait states
+                      =1   121                                             ;0---------000---  reserved
+                      =1   122                                             ;-0000001--------  MCS is 8KB
+                      =1   123                                             ;--------1-------  output PCS5/PCS6
+                      =1   124                                             ;---------0------  PCS in I/O space
+                      =1   125                                             ;-------------0--  wait for RDY inputs
+                      =1   126                                             ;--------------11  3 wait states
+                      =1   127     
+                      =1   128     
+                      =1   129     
+                      =1   130     ; Timing Definitions
+                      =1   131     
+  0900                =1   132     COUNTS_PER_MS   EQU     2304            ;number of timer counts per 1 ms (assumes 18.
+                                   432 MHz clock)
+  0900                =1   133     MS_PER_SEG      EQU     2304             ;number of ms for each segment
+                      =1   134     
+                      =1   135     
+                      =1   136     
+                      =1   137     ; General Definitions
+                      =1   138     
+  0001                =1   139     FIRST_RESERVED_VEC      EQU     1       ;reserve vectors 1-3
+  0003                =1   140     LAST_RESERVED_VEC       EQU     3
+  0100                =1   141     NUM_IRQ_VECTORS         EQU     256     ;number of interrupt vectors
+                      =1   142     
+  0000                =1   143     LEDDisplay      EQU     0000H           ;display address
+                      =1   144     
+  0008                =1   145     NUM_DIGITS      EQU     8               ;number of digits in the display
+                           146     
+                           147     
+                           148     CGROUP  GROUP   CODE
+                           149     
+----                       150     CODE SEGMENT PUBLIC 'CODE'
+                           151     
+                           152             ASSUME  CS:CGROUP
+                           153     
+                           154             EXTRN   MuxSegPatterns:NEAR
+                           155             EXTRN   Scan:NEAR
+                           156             
+                           157     ; TimerEventHandler
+                           158     ;
+                           159     ; Description:       This procedure is the event handler for the timer
+8086/87/88/186 MACRO ASSEMBLER    EH_TI                                                    23:10:14  11/05/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           160     ;                    interrupt.  It first saves the registers, and then
+                           161     ;                    calls "MuxSegmentPatterns", a function defined in
+                           162     ;                    displays.asm that puts the segment patterns of each
+                           163     ;                    character int he string on the display. Finally, it 
+                           164     ;                    sends an EOI to the event handler and restorest eh register. 
+                           165     ;
+                           166     ; Operation:         First, the function puts the registers on the stack. Then,
+                           167     ;                    it calls MuxSegPatterns to display the segments on the 
+                           168     ;                    display. Finally it sends the EOI to the event handler and
+                           169     ;                    restores the registers. 
+                           170     
+                           171     ;
+                           172     ; Arguments:         None.
+                           173     ; Return Value:      None.
+                           174     ;
+                           175     ; Local Variables:   None.
+                           176     ; Shared Variables:  None.
+                           177     ; Global Variables:  None.
+                           178     ;
+                           179     ; Input:             None.
+                           180     ; Output:            None.
+                           181     ;
+                           182     ; Error Handling:    None.
+                           183     ;
+                           184     ; Algorithms:        None.
+                           185     ; Data Structures:   None.
+                           186     ;
+                           187     ; Registers Changed: None
+                           188     ; Stack Depth:       3 words
+                           189     ;
+                           190     ; Author:            Glen George
+                           191     ; Last Modified:     Jan. 27, 2003
+                           192     
+0000                       193     TimerEventHandler       PROC    NEAR
+                           194     
+0000                       195     StartEventHandler:
+                           196     
+0000 50                    197             PUSH    AX                      ;save the registers
+0001 53                    198             PUSH    BX                      ;Event Handlers should NEVER change
+0002 52                    199             PUSH    DX                      ;any register values
+                           200     
+0003 E80000         E      201     Call MuxSegPatterns                     ; calls function to display segment
+                           202                                             ; patterns on the display one at a time
+                           203                                             ; but very quickly (muxing)
+0006 E80000         E      204     Call Scan                               ; calls function to get inputs from
+                           205                                             ;keypad
+                           206     
+                           207     
+0009                       208     EndTimerEventHandler:                   
+                           209     
+0009 BA22FF                210             MOV     DX, INTCtrlrEOI       ;send the EOI to the interrupt controller
+000C B80800                211             MOV     AX, TimerEOI
+000F EE                    212             OUT     DX, AL
+                           213     
+0010 5A                    214             POP     DX                      ;restore the registers
+8086/87/88/186 MACRO ASSEMBLER    EH_TI                                                    23:10:14  11/05/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0011 5B                    215             POP     BX
+0012 58                    216             POP     AX
+                           217     
+                           218     
+0013 CF                    219             IRET                  ;and return (Event Handlers end with IRET not RET)
+                           220     
+                           221     
+                           222     TimerEventHandler       ENDP
+                           223     
+----                       224     CODE ENDS
+                           225     
+                           226     
+                           227     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

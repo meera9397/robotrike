@@ -1,0 +1,82 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     20:39:32  11/23/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN
+OBJECT MODULE PLACED IN MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                 MAIN LOOP                                  ;
+                             5     ;                                  EE/CS  51                                 ;
+                             6     ;                                                                            ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; Description:      This main loop is used to test my macros. 
+                            10     
+                            11     
+                            12     
+                            13     ;definitions
+                            14     
+                            15     CGROUP  GROUP   CODE
+                            16     DGROUP  GROUP   DATA
+                            17          
+----                        18     CODE    SEGMENT PUBLIC 'CODE'
+                            19                     ASSUME  CS:CGROUP, DS:DGROUP
+                            20                     EXTRN   TestMacros:NEAR 
+                            21             
+                            22     ;external function declarations
+                            23     
+                            24     
+0000                        25     START:  
+                            26     
+0000                        27     MAIN:
+0000 FA                     28             CLI
+0001 B8----         R       29             MOV     AX, STACK               ;initialize the stack pointer
+0004 8ED0                   30             MOV     SS, AX
+0006 BCE00190       R       31             MOV     SP, OFFSET(TopOfStack)
+                            32     
+000A B8----         R       33             MOV     AX, DGROUP                ;initialize the data segment
+000D 8ED8                   34             MOV     DS, AX
+                            35                     
+000F E80000         E       36                     Call TestMacros
+                            37                     
+0012 EBFE                   38             Forever: JMP    Forever         ;sit in an infinite loop, nothing to
+                            39                                             ;do in the background routine
+0014 F4                     40             HLT                             ;never executed (hopefully)
+                            41     
+----                        42     CODE ENDS
+                            43     ;the data segment. initialized because used later on. 
+                            44     
+----                        45     DATA    SEGMENT PUBLIC  'DATA'
+                            46     
+                            47     
+----                        48     DATA    ENDS
+                            49     
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     20:39:32  11/23/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     ;the stack
+                            52     
+----                        53     STACK   SEGMENT STACK  'STACK'
+                            54     
+0000 (80                    55                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                            56     
+01E0                        57     TopOfStack      LABEL   WORD
+                            58     
+----                        59     STACK   ENDS
+                            60     
+                            61     
+                            62     
+                            63     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

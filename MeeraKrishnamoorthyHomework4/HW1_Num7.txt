@@ -1,0 +1,29 @@
+Hw 1, #7
+Meera Krishnamoorthy
+
+A) Is the event handler being called?
+Yes, the event handler is being called because the Interrupt Request Register is 1, meaning
+a timer interrupt has been requested. 
+
+B) Is the timer running? 
+Yes, the timer is running. The timer control register 2 has its enable bit set,
+which indicates that the timer is in use. 
+
+C) Is the timer generating interrupts?
+Yes, the timer is generating interrupts because Timer 2 has its
+interrupt bit set (which is set to generate an interrupt request when the Count  
+register equals a Maximum Count register.)
+
+D) Is the processor responding to interrupts in general (are they enabled)?
+No, the processor is not responding to interrupt requests, because the interrupt
+mask and the priority mask register is set so that timer interrupts are not
+responded to. 
+ 
+
+E) By now you should realize what the bug is in the code. Explain how to fix the bug 
+   and then fix it in the debugger (don't change the code) and continue running the 
+   program. What do you observe?
+
+The bug is that the interrupt mask registers isset so that 
+timer interrupts are not responded to. In order to change this, we must clear the interrupt mask register so that the timer interrupt can be responded to (write 0 to ff28h).
+Once this is done, something is printed to the dipslay: U 6oL IC

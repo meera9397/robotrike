@@ -1,0 +1,282 @@
+8086/87/88/186 MACRO ASSEMBLER    SEGTABLE                                                 19:16:30  12/08/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE SEGTABLE
+OBJECT MODULE PLACED IN SEGTABLE.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE SEGTABLE.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME  SEGTABLE
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   SEGTABLE                                 ;
+                             6     ;                           Tables of 7-Segment Codes                        ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; This file contains tables of 7-segment codes.  The segment ordering is a to
+                            11     ; g followed by the decimal point with segment a in the low bit and the
+                            12     ; decimal point in the high bit.  The tables included are:
+                            13     ;    ASCIISegTable - table of codes for 7-bit ASCII characters
+                            14     ;    DigitSegTable - table of codes for hexadecimal digits
+                            15     ;
+                            16     ; Revision History:
+                            17     ;    11/12/93  Glen George              initial revision
+                            18     ;    11/7/94   Glen George              added Revision History section
+                            19     ;    11/7/95   Glen George              added DigitSegTable
+                            20     ;    10/26/98  Glen George              updated comments
+                            21     ;    12/26/99  Glen George              changed segment name from PROGRAM to
+                            22     ;                                          CODE
+                            23     ;                                       added CGROUP group declaration
+                            24     ;                                       updated comments
+                            25     ;    12/25/00  Glen George              updated comments
+                            26     ;     2/06/07  Glen George              added pattern for lowercase 'g'
+                            27     
+                            28     
+                            29     
+                            30     ; local include files
+                            31     ;    none
+                            32     
+                            33     
+                            34     
+                            35     
+                            36     ;setup code group and start the code segment
+                            37     CGROUP  GROUP   CODE
+                            38     
+----                        39     CODE    SEGMENT PUBLIC 'CODE'
+                            40     
+                            41     
+                            42     
+                            43     
+                            44     ; ASCIISegTable
+                            45     ;
+                            46     ; Description:      This is the segment pattern table for ASCII characters.
+                            47     ;                   It contains the active-high segment patterns for all
+                            48     ;                   possible 7-bit ASCII codes.  Codes which do not have a
+                            49     ;                   "reasonable" way of being displayed on a 7-segment display
+                            50     ;                   are left blank.  None of the codes set the decimal point.
+8086/87/88/186 MACRO ASSEMBLER    SEGTABLE                                                 19:16:30  12/08/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     ;
+                            52     ; Notes:            READ ONLY tables should always be in the code segment so
+                            53     ;                   that in a standalone system it will be located in the
+                            54     ;                   ROM with the code.
+                            55     ;
+                            56     ; Author:           Glen George
+                            57     ; Last Modified:    Nov. 11, 1993
+                            58     
+0000                        59     ASCIISegTable   LABEL   BYTE
+                            60                     PUBLIC  ASCIISegTable
+                            61     
+                            62     
+                            63     ;       DB      .gfedcba                ;ASCII character
+                            64     
+0000 00                     65             DB      00000000B               ;NUL
+0001 00                     66             DB      00000000B               ;SOH
+0002 00                     67             DB      00000000B               ;STX
+0003 00                     68             DB      00000000B               ;ETX
+0004 00                     69             DB      00000000B               ;EOT
+0005 00                     70             DB      00000000B               ;ENQ
+0006 00                     71             DB      00000000B               ;ACK
+0007 00                     72             DB      00000000B               ;BEL
+0008 00                     73             DB      00000000B               ;backspace
+0009 00                     74             DB      00000000B               ;TAB
+000A 00                     75             DB      00000000B               ;new line
+000B 00                     76             DB      00000000B               ;vertical tab
+000C 00                     77             DB      00000000B               ;form feed
+000D 00                     78             DB      00000000B               ;carriage return
+000E 00                     79             DB      00000000B               ;SO
+000F 00                     80             DB      00000000B               ;SI
+0010 00                     81             DB      00000000B               ;DLE
+0011 00                     82             DB      00000000B               ;DC1
+0012 00                     83             DB      00000000B               ;DC2
+0013 00                     84             DB      00000000B               ;DC3
+0014 00                     85             DB      00000000B               ;DC4
+0015 00                     86             DB      00000000B               ;NAK
+0016 00                     87             DB      00000000B               ;SYN
+0017 00                     88             DB      00000000B               ;ETB
+0018 00                     89             DB      00000000B               ;CAN
+0019 00                     90             DB      00000000B               ;EM
+001A 00                     91             DB      00000000B               ;SUB
+001B 00                     92             DB      00000000B               ;escape
+001C 00                     93             DB      00000000B               ;FS
+001D 00                     94             DB      00000000B               ;GS
+001E 00                     95             DB      00000000B               ;AS
+001F 00                     96             DB      00000000B               ;US
+                            97     
+                            98     ;       DB      .gfedcba                ;ASCII character
+                            99     
+0020 00                    100             DB      00000000B               ;space
+0021 00                    101             DB      00000000B               ;!
+0022 22                    102             DB      00100010B               ;"
+0023 00                    103             DB      00000000B               ;#
+0024 00                    104             DB      00000000B               ;$
+0025 00                    105             DB      00000000B               ;percent symbol
+8086/87/88/186 MACRO ASSEMBLER    SEGTABLE                                                 19:16:30  12/08/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0026 00                    106             DB      00000000B               ;&
+0027 02                    107             DB      00000010B               ;'
+0028 39                    108             DB      00111001B               ;(
+0029 0F                    109             DB      00001111B               ;)
+002A 00                    110             DB      00000000B               ;*
+002B 00                    111             DB      00000000B               ;+
+002C 00                    112             DB      00000000B               ;,
+002D 40                    113             DB      01000000B               ;-
+002E 00                    114             DB      00000000B               ;.
+002F 00                    115             DB      00000000B               ;/
+0030 3F                    116             DB      00111111B               ;0
+0031 06                    117             DB      00000110B               ;1
+0032 5B                    118             DB      01011011B               ;2
+0033 4F                    119             DB      01001111B               ;3
+0034 66                    120             DB      01100110B               ;4
+0035 6D                    121             DB      01101101B               ;5
+0036 7D                    122             DB      01111101B               ;6
+0037 07                    123             DB      00000111B               ;7
+0038 7F                    124             DB      01111111B               ;8
+0039 67                    125             DB      01100111B               ;9
+003A 00                    126             DB      00000000B               ;:
+003B 00                    127             DB      00000000B               ;;
+003C 00                    128             DB      00000000B               ;<
+003D 48                    129             DB      01001000B               ;=
+003E 00                    130             DB      00000000B               ;>
+003F 00                    131             DB      00000000B               ;?
+                           132     
+                           133     ;       DB      .gfedcba                ;ASCII character
+                           134     
+0040 5F                    135             DB      01011111B               ;@
+0041 77                    136             DB      01110111B               ;A
+0042 7F                    137             DB      01111111B               ;B
+0043 39                    138             DB      00111001B               ;C
+0044 3F                    139             DB      00111111B               ;D
+0045 79                    140             DB      01111001B               ;E
+0046 71                    141             DB      01110001B               ;F
+0047 7D                    142             DB      01111101B               ;G
+0048 76                    143             DB      01110110B               ;H
+0049 06                    144             DB      00000110B               ;I
+004A 1E                    145             DB      00011110B               ;J
+004B 00                    146             DB      00000000B               ;K
+004C 38                    147             DB      00111000B               ;L
+004D 00                    148             DB      00000000B               ;M
+004E 00                    149             DB      00000000B               ;N
+004F 3F                    150             DB      00111111B               ;O
+0050 73                    151             DB      01110011B               ;P
+0051 00                    152             DB      00000000B               ;Q
+0052 00                    153             DB      00000000B               ;R
+0053 6D                    154             DB      01101101B               ;S
+0054 00                    155             DB      00000000B               ;T
+0055 3E                    156             DB      00111110B               ;U
+0056 00                    157             DB      00000000B               ;V
+0057 00                    158             DB      00000000B               ;W
+0058 00                    159             DB      00000000B               ;X
+0059 66                    160             DB      01100110B               ;Y
+8086/87/88/186 MACRO ASSEMBLER    SEGTABLE                                                 19:16:30  12/08/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+005A 00                    161             DB      00000000B               ;Z
+005B 39                    162             DB      00111001B               ;[
+005C 00                    163             DB      00000000B               ;\
+005D 0F                    164             DB      00001111B               ;]
+005E 00                    165             DB      00000000B               ;^
+005F 08                    166             DB      00001000B               ;_
+                           167     
+                           168     ;       DB      .gfedcba                ;ASCII character
+                           169     
+0060 20                    170             DB      00100000B               ;`
+0061 00                    171             DB      00000000B               ;a
+0062 7C                    172             DB      01111100B               ;b
+0063 58                    173             DB      01011000B               ;c
+0064 5E                    174             DB      01011110B               ;d
+0065 00                    175             DB      00000000B               ;e
+0066 00                    176             DB      00000000B               ;f
+0067 6F                    177             DB      01101111B               ;g
+0068 74                    178             DB      01110100B               ;h
+0069 04                    179             DB      00000100B               ;i
+006A 00                    180             DB      00000000B               ;j
+006B 00                    181             DB      00000000B               ;k
+006C 30                    182             DB      00110000B               ;l
+006D 00                    183             DB      00000000B               ;m
+006E 54                    184             DB      01010100B               ;n
+006F 5C                    185             DB      01011100B               ;o
+0070 00                    186             DB      00000000B               ;p
+0071 00                    187             DB      00000000B               ;q
+0072 50                    188             DB      01010000B               ;r
+0073 00                    189             DB      00000000B               ;s
+0074 78                    190             DB      01111000B               ;t
+0075 1C                    191             DB      00011100B               ;u
+0076 00                    192             DB      00000000B               ;v
+0077 00                    193             DB      00000000B               ;w
+0078 00                    194             DB      00000000B               ;x
+0079 6E                    195             DB      01101110B               ;y
+007A 00                    196             DB      00000000B               ;z
+007B 00                    197             DB      00000000B               ;{
+007C 06                    198             DB      00000110B               ;|
+007D 00                    199             DB      00000000B               ;}
+007E 01                    200             DB      00000001B               ;~
+007F 00                    201             DB      00000000B               ;rubout
+                           202     
+                           203     
+                           204     
+                           205     
+                           206     ; DigitSegTable
+                           207     ;
+                           208     ; Description:      This is the segment pattern table for hexadecimal digits.
+                           209     ;                   It contains the active-high segment patterns for all hex
+                           210     ;                   digits (0123456789AbCdEF).  None of the codes set the
+                           211     ;                   decimal point.  
+                           212     ;
+                           213     ; Notes:            READ ONLY tables should always be in the code segment so
+                           214     ;                   that in a standalone system it will be located in the
+                           215     ;                   ROM with the code.
+8086/87/88/186 MACRO ASSEMBLER    SEGTABLE                                                 19:16:30  12/08/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     ;
+                           217     ; Author:           Glen George
+                           218     ; Last Modified:    Nov. 7, 1995
+                           219     
+0080                       220     DigitSegTable   LABEL   BYTE
+                           221                     PUBLIC  DigitSegTable
+                           222     
+                           223     
+                           224     ;       DB      .gfedcba                ;Hex Digit
+                           225     
+0080 3F                    226             DB      00111111B               ;0
+0081 06                    227             DB      00000110B               ;1
+0082 5B                    228             DB      01011011B               ;2
+0083 4F                    229             DB      01001111B               ;3
+0084 66                    230             DB      01100110B               ;4
+0085 6D                    231             DB      01101101B               ;5
+0086 7D                    232             DB      01111101B               ;6
+0087 07                    233             DB      00000111B               ;7
+0088 7F                    234             DB      01111111B               ;8
+0089 67                    235             DB      01100111B               ;9
+008A 77                    236             DB      01110111B               ;A
+008B 7C                    237             DB      01111100B               ;b
+008C 39                    238             DB      00111001B               ;C
+008D 5E                    239             DB      01011110B               ;d
+008E 79                    240             DB      01111001B               ;E
+008F 71                    241             DB      01110001B               ;F
+                           242     
+                           243     
+                           244     
+                           245     
+----                       246     CODE    ENDS
+                           247     
+                           248     
+                           249     
+                           250             END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

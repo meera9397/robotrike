@@ -1,0 +1,230 @@
+8086/87/88/186 MACRO ASSEMBLER    TIMER1                                                   18:17:53  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE TIMER1
+OBJECT MODULE PLACED IN TIMER.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE TIMER.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1            NAME  TIMER1
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                   TIMER                                   ;
+                             5     ;                     Timer Initialization Function to set up event          ;
+                             6     ;                                   handler                                  ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; Description:      This program contains the function to initialize the timer
+                            10     ;                                       to be used to control event handlers.
+                            11     ; Table of Contents: 
+                            12     ; 1) InitTimer: initializes 80188 timers. 
+                            13     ;
+                            14     ; Revision History:
+                            15     ;      10/30/16  Meera Krishnamoorthy   used functions written by Glen George
+                            16     ;                                       to use for event handling/ timers
+                            17     
+                            18     
+                            19     ; local include files
+                            20 +1  $INCLUDE(EH.INC)
+                      =1    21     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    22     ;                                                                            ;
+                      =1    23     ;                                      EH.INC                                ;
+                      =1    24     ;                              Event Handler Demo                            ;
+                      =1    25     ;                                 Include File                               ;
+                      =1    26     ;                                                                            ;
+                      =1    27     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    28     
+                      =1    29     ; This file contains the definitions for the Event Handler Demonstration
+                      =1    30     ; program (EH.ASM)
+                      =1    31     
+  0001                =1    32     FIRST_RESERVED_VEC      EQU     1       ;reserve vectors 1-3
+  0003                =1    33     LAST_RESERVED_VEC       EQU     3
+  0100                =1    34     NUM_IRQ_VECTORS         EQU     256     ;number of interrupt vectors
+                      =1    35     
+                      =1    36     
+                            37 +1  $INCLUDE(IRQ.INC)
+                      =1    38     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    39     ;                                                                            ;
+                      =1    40     ;                                 INTERRUPT.INC                              ;
+                      =1    41     ;                              Event Handler Demo                            ;
+                      =1    42     ;                                 Include File                               ;
+                      =1    43     ;                                                                            ;
+                      =1    44     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    45     ; Addresses
+  FF32                =1    46     INTCtrlrCtrl    EQU     0FF32H          ;address of interrupt controller for timer
+  FF22                =1    47     INTCtrlrEOI     EQU     0FF22H          ;address of interrupt controller EOI register
+                      =1    48     
+                      =1    49     ; Register Values
+  0001                =1    50     INTCtrlrCVal    EQU     00001H          ;set priority for timers to 1 and enable
+8086/87/88/186 MACRO ASSEMBLER    TIMER1                                                   18:17:53  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51                                             ;000000000000----  reserved
+                      =1    52                                             ;------------0---  enable timer interrupt
+                      =1    53                                             ;-------------001  timer priority
+  0008                =1    54     TimerEOI        EQU     00008H          ;Timer EOI command (same for all timers)
+  8000                =1    55     NonSpecEOI      EQU     08000H          ;Non-specific EOI command
+                      =1    56     
+                      =1    57     
+  000E                =1    58     Int2EOI         EQU     000EH           ; INT2 EOI command
+                            59 +1  $INCLUDE(TIMER.INC)
+                      =1    60     
+                      =1    61     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    62     ;                                                                            ;
+                      =1    63     ;                                   TIMER.INC                                ;
+                      =1    64     ;                              Event Handler Demo                            ;
+                      =1    65     ;                                 Include File                               ;
+                      =1    66     ;                                                                            ;
+                      =1    67     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    68     
+                      =1    69     ; This file contains the definitions for intializing and using the timer for 
+                      =1    70     ; event handlers
+                      =1    71     
+                      =1    72     ; Timer Definitions
+                      =1    73     
+                      =1    74     ; Addresses
+  FF56                =1    75     Tmr0Ctrl        EQU     0FF56H          ;address of Timer 0 Control Register
+  FF52                =1    76     Tmr0MaxCntA     EQU     0FF52H          ;address of Timer 0 Max Count A Register
+  FF50                =1    77     Tmr0Count       EQU     0FF50H          ;address of Timer 0 Count Register
+                      =1    78     
+                      =1    79     ; Control Register Values
+  E001                =1    80     Tmr0CtrlVal     EQU     0E001H          ;value to write to Timer 0 Control Register
+                      =1    81                                             ;1---------------  enable timer
+                      =1    82                                             ;-1--------------  write to control
+                      =1    83                                             ;--1-------------  enable interrupts
+                      =1    84                                             ;----000000------  reserved
+                      =1    85                                             ;---0------0-----  read only
+                      =1    86                                             ;-----------0----  TMRIN0 is an enable
+                      =1    87                                             ;------------00--  count timer 2 outs
+                      =1    88                                             ;--------------0-  single counter mode
+                      =1    89                                             ;---------------1  continuous mode
+  C001                =1    90     Tmr2CtrlVal     EQU     0C001H          ;value to write to Timer 2 Control Register
+                      =1    91                                             ;1---------------  enable timer
+                      =1    92                                             ;-1--------------  write to control
+                      =1    93                                             ;--0-------------  no interrupts
+                      =1    94                                             ;----000000-0000-  reserved
+                      =1    95                                             ;---0------0-----  read only
+                      =1    96                                             ;---------------1  continuous mode
+                      =1    97     
+                      =1    98     ; Interrupt Vectors
+  0008                =1    99     Tmr0Vec         EQU     8               ;interrupt vector for Timer 0
+                      =1   100     
+                      =1   101     ; Timing Definitions
+                      =1   102     
+  0900                =1   103     COUNTS_PER_MS   EQU     2304            ;number of timer counts per 1 ms (assumes 18.
+                                   432 MHz clock)
+  0900                =1   104     MS_PER_SEG      EQU     2304             ;number of ms for each segment
+8086/87/88/186 MACRO ASSEMBLER    TIMER1                                                   18:17:53  12/09/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           105 +1  $INCLUDE(DISPLAY.INC)
+                      =1   106     ; DISPLAY.INC
+                      =1   107     ; This file contains the constants for the functions in "display.asm", three
+                      =1   108     ; of which are used to convert decimal/hexadecimal numbers into segment patterns,
+                      =1   109     ; and two of which are used to display those segment patterns on the board
+                      =1   110     
+                      =1   111     
+                      =1   112     ; Revision History:
+                      =1   113     ;    10/30/16  Meera Krishnamoorthy wrote constants
+                      =1   114     
+  0000                =1   115     ASCII_NULL      equ 0           ;used to check if the string was terminated
+  0008                =1   116     DISPLAY_LEN     equ 8           ;the number of characters that can be displayed
+                      =1   117                                     ;on the display
+                      =1   118     ; these constants are the same as the ones above, but exist in case the
+                      =1   119     ; LED Display Address changes                                
+  0000                =1   120     LEDDisplay      equ 0000H                       ;display address of initial segment
+  0008                =1   121     LEDHighByteAdd  equ LEDDisplay + DISPLAY_LEN    ;display address of offset segments i
+                                   n
+                      =1   122                                                     ; MuxSegPatterns
+                      =1   123     
+  0010                =1   124     BUFFER_LENGTH equ 16 ; length of buffer storing segments
+                           125     
+                           126     CGROUP  GROUP   CODE
+                           127     
+----                       128     CODE SEGMENT PUBLIC 'CODE'
+                           129     
+                           130             ASSUME  CS:CGROUP
+                           131             
+                           132     
+                           133     ; InitTimer
+                           134     ;
+                           135     ; Description:       Initialize the 80188 Timer 0.  The timers are initialized
+                           136     ;                    to generate interrupts every MS_PER_SEG milliseconds.
+                           137     ;                    The interrupt controller is also initialized to allow the
+                           138     ;                    timer interrupts. 
+                           139     ;
+                           140     ; Operation:         The appropriate values are written to the timer control
+                           141     ;                    registers in the PCB.  Also, the timer count registers
+                           142     ;                    are reset to zero.  Finally, the interrupt controller is
+                           143     ;                    setup to accept timer interrupts and any pending
+                           144     ;                    interrupts are cleared by sending a TimerEOI to the
+                           145     ;                    interrupt controller.
+                           146     ;
+                           147     ; Arguments:         None.
+                           148     ; Return Value:      None.
+                           149     ;
+                           150     ; Local Variables:   None.
+                           151     ; Shared Variables:  None.
+                           152     ; Global Variables:  None.
+                           153     ;
+                           154     ; Input:             None.
+                           155     ; Output:            None.
+                           156     ;
+                           157     ; Error Handling:    None.
+                           158     ;
+8086/87/88/186 MACRO ASSEMBLER    TIMER1                                                   18:17:53  12/09/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           159     ; Algorithms:        None.
+                           160     ; Data Structures:   None.
+                           161     ;
+                           162     ; Registers Changed: AX, DX
+                           163     ; Stack Depth:       0 words
+                           164     ;
+                           165     ; Author:            Glen George
+                           166     ; Last Modified:     Oct. 29, 1997
+                           167     
+0000                       168     InitTimer       PROC    NEAR
+                           169     PUBLIC      InitTimer
+0000 BA50FF                170             MOV     DX, Tmr0Count   ;initialize the count register to 0
+0003 33C0                  171             XOR     AX, AX
+0005 EE                    172             OUT     DX, AL
+                           173     
+0006 BA52FF                174             MOV     DX, Tmr0MaxCntA ;setup max count for milliseconds per segment
+0009 B80009                175             MOV     AX, MS_PER_SEG  ;   count so can time the segments
+000C EE                    176             OUT     DX, AL
+                           177     
+000D BA56FF                178             MOV     DX, Tmr0Ctrl    ;setup the control register, interrupts on
+0010 B801E0                179             MOV     AX, Tmr0CtrlVal
+0013 EE                    180             OUT     DX, AL
+                           181     
+                           182                                     ;initialize interrupt controller for timers
+0014 BA32FF                183             MOV     DX, INTCtrlrCtrl;setup the interrupt control register
+0017 B80100                184             MOV     AX, INTCtrlrCVal
+001A EE                    185             OUT     DX, AL
+                           186     
+001B BA22FF                187             MOV     DX, INTCtrlrEOI ;send a timer EOI (to clear out controller)
+001E B80800                188             MOV     AX, TimerEOI
+0021 EE                    189             OUT     DX, AL
+                           190     
+                           191     
+0022 C3                    192             RET                     ;done so return
+                           193     
+                           194     
+                           195     InitTimer       ENDP
+                           196     
+                           197     
+----                       198     CODE ENDS
+                           199     
+                           200     
+                           201     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

@@ -1,0 +1,20 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: HW91.LNK, HW93.LNK
+OUTPUT FILE: HW94.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  12/09/;6  TIME:  18:18:01
+
+
+LINK MAP OF MODULE CONVERTS
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 037FH ------    G    CODE            CODE                          
+ 002AH ------    G    DATA            DATA                          
+
+INPUT MODULES INCLUDED:
+HW91.LNK(CONVERTS)
+HW93.LNK(INT2)

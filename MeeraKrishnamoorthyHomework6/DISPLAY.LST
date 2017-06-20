@@ -1,0 +1,20 @@
+8086/87/88/186 MACRO ASSEMBLER    ANONYMOUS                                                01:02:01  11/13/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE ANONYMOUS
+OBJECT MODULE PLACED IN DISPLAY.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE DISPLAY.INC M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     ; Display.INC
+                             2     ; Definitions needed for the Display
+                             3     
+  0000                       4     LEDDisplay      EQU     0000H           ;display address
+                             5     
+  0008                       6     NUM_DIGITS      EQU     8               ;number of digits in the display
+*** ERROR #89 IN 6, PREMATURE END OF FILE (NO END STATEMENT)
+*** ERROR #151 IN 6, NO NAME DIRECTIVE ENCOUNTERED, DEFAULT MODULE NAME USED
+
+ASSEMBLY COMPLETE, 2 ERRORS FOUND

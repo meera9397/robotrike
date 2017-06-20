@@ -1,0 +1,46 @@
+
+Dec2String:
+  MOV AX, n
+  MOV SI, a
+  MOV BX, 0
+  MOV CX, 10000
+  CMP AX, 0
+  JC NegationLabel
+  JCXZ CalculateASCII
+
+NegationLabel:
+  NEG AX
+  MOV ‘-‘, [SI]
+  INC SI
+
+
+CalculateASCII:
+  MOV DX, 0
+  DIV CX
+  CMP AX, 0
+  JL ReducePower
+
+  MOV BX, DX
+  MOV word ptr AX, [SI]
+  ADD [SI], ‘0’
+  INC SI
+
+
+  MOV AX, CX
+  DIV 10
+  MOV AX, BX
+
+  CMP CX, 1
+  JGE CalculateASCII
+  JL END
+
+ReducePower:
+  MOV BX, AX
+  MOV AX, CX
+  DIV 10
+  MOV CX, AX
+  MOV AX, BX
+  JMP CalculateASCII
+
+END:
+  ADD [SI], ‘null’

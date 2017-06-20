@@ -1,0 +1,1293 @@
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MFUNC
+OBJECT MODULE PLACED IN MFUNC2.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MFUNC2.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    MFUNC
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                      FUNCTIONS USED IN MOTOR MAIN LOOP                     ;
+                             6     ;                                   EE/CS 51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     
+                            11     ; File Description: This file contains the functions used in the motor 
+                            12     ; main loop. These functions output to the motors to change its
+                            13     ; speed, angle, and laser status, and also output to the serial
+                            14     ; to describe the changed motor status or, if the motor status couldn't change,
+                            15     ; the reason for the lack of change (serial/parsing error). 
+                            16     ; 
+                            17     ; Table of Contents
+                            18     ; 1) InitEventQueue: initializes event queue
+                            19     ; 2) DequeueEventMotor: dequeues event from event queue
+                            20     ; 3) EnqueueEvent: enqueues event to event queue 
+                            21     ; 4) InitMotorFunct: initializes shared variables used in the following 
+                            22     ;                     functions
+                            23     ; 5) GetError: send serial errors that occur/ prevents any more
+                            24     ;              data from being sent serially until error message
+                            25     ;              has been sent
+                            26     ; 6) GetReceivedData: parses data received serially from remote side
+                            27     ;                                         and sends commands to motors indicating
+                            28     ;                                         whether to change speed/direction/laser sta
+                                   tus
+                            29     ;                                         then sends updated speed/direction to 
+                            30     ;                                         remote side to display
+                            31     ; 7) SerialPutString: sends strings to remote side from motor side
+                            32     ; 8) DisplayMotorInfo: creates string with updated speed and direction
+                            33     ; 9) CheckCriticalFlag: called by the main loop to check if the event queue
+                            34     ;                        is full
+                            35     ; 
+                            36     ; 
+                            37     ; Revision History: Meera Krishnamoorthy 12/8/16    wrote code, debugged
+                            38     ;
+                            39     ;
+                            40     
+                            41     CGROUP  GROUP   CODE
+                            42     DGROUP  GROUP   DATA
+                            43     
+                            44     
+----                        45     CODE    SEGMENT PUBLIC 'CODE'
+                            46     
+                            47     ; used to create/ dequeue/ enqueue from event queue
+                            48     EXTRN   QueueInit:NEAR
+                            49     EXTRN   Enqueue:NEAR
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            50     EXTRN   Dequeue:NEAR
+                            51     EXTRN   QueueFull:NEAR
+                            52     EXTRN   QueueEmpty:NEAR
+                            53     
+                            54     
+                            55     ; used to send values over serial channel
+                            56     EXTRN   SerialPutChar:NEAR
+                            57     
+                            58     EXTRN ParseSerialChar:NEAR
+                            59     
+                            60     EXTRN GetMotorSpeed:NEAR
+                            61     EXTRN GetMotorDirection:NEAR
+                            62     EXTRN GetLaser:NEAR
+                            63     
+                            64     EXTRN Dec2String:NEAR
+                            65     EXTRN Hex2String:NEAR
+                            66     
+                            67     EXTRN doNOP:NEAR
+                            68     
+                            69 +1  $INCLUDE(MAIN9.inc)
+                      =1    70     ; MAIN9.INC
+                      =1    71     ; This contains all of the constants needed to run the remote main loop.
+                      =1    72     
+                      =1    73     ; error flags/ related values
+  007B                =1    74     CRITICAL_FLAG       EQU 123 ; this is the value that the critical flag shoul
+                      =1    75                                 ; be set to when the queue is full
+  0042                =1    76     ERROR_FLAG_VAL      EQU 66 ; this is the value our error flag is set to
+                      =1    77                                ; when there is an error
+  0006                =1    78     QUEUE_EMPTY_CONST   EQU 6  ; this is the constant that corresponds to the
+                      =1    79                                ; appropriate function to call in the RemoteTable
+                      =1    80                                ; call table when the queue is empty
+                      =1    81                                
+                      =1    82                                
+                      =1    83     
+                      =1    84     ; ASCII constants
+                      =1    85     ; These are contained in other files, but are here simply for quick
+                      =1    86     ; reference
+                      =1    87     
+  000D                =1    88     CARRIAGE_RETURN     EQU 13 ; this is the ASCII value of a carriage return.
+                      =1    89                                ; the motor unit recognizes this character
+                      =1    90                                ; as the end of a command, so when we send
+                      =1    91                                ; strings serially, they need to end with
+                      =1    92                                ; a carriage return
+                      =1    93                               
+                      =1    94     
+                      =1    95     ; constants related to size
+  000F                =1    96     MAX_KEY_PRESS       EQU 15 ; this is the maximum number of keys 
+                      =1    97                                ; in our AllKeyPresses table (all the keys we are 
+                      =1    98                                ; considering valid key presses)
+                      =1    99     
+  0400                =1   100     EVENTQUEUE_SIZE     EQU 1024 ; this is the size of our event queue
+                      =1   101     
+                      =1   102     
+                      =1   103     
+  0018                =1   104     MAX_ERROR_TABLE_VAL   EQU 24 ; this is length of the ErrorTable if the
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   105                                  ; table is a word table. since the lsr
+                      =1   106                                  ; is set (error wise) as multiples of 2
+                      =1   107                                  ; this value is used to determine
+                      =1   108                                  ; if the lsr value is within the table. 
+                      =1   109                                  
+                      =1   110     
+                      =1   111     ; the following constants are used in the KeyPress table to check
+                      =1   112     ; if a key pressed has a valid value (we are defining what
+                      =1   113     ; valid key presses are)  
+                      =1   114     ; the values (e, d, b, 7) for each key are actually related
+                      =1   115     ; to value locations read from the address 80H to 83H (the keypad) when the
+                      =1   116     ; keys are pressed. e, d, b, 7 aren't the entire values corresponding
+                      =1   117     ; to the key presses, but they are the uniqe part of each key value
+                      =1   118                                
+  00E0                =1   119     KEY_PRESS_1 EQU          0E0H       ; key press corresponding to a value of 
+                      =1   120                                         ; e in row 0
+  00D0                =1   121     KEY_PRESS_2 EQU          0D0H       ; key press corresponding to a value of 
+                      =1   122                                         ; d in row 0
+  00B0                =1   123     KEY_PRESS_3 EQU          0B0H       ; key press corresponding to a value of 
+                      =1   124                                         ; b in row 0
+  0070                =1   125     KEY_PRESS_4 EQU          070H       ; key press corresponding to a value of 
+                      =1   126                                         ; 7 in row 0
+                      =1   127            
+  00E1                =1   128     KEY_PRESS_5 EQU          0E1H       ; key press corresponding to a value of 
+                      =1   129                                         ; e in row 1
+  00D1                =1   130     KEY_PRESS_6 EQU          0D1H       ; key press corresponding to a value of 
+                      =1   131                                         ; d in row 1
+  00B1                =1   132     KEY_PRESS_7 EQU          0B1H       ; key press corresponding to a value of 
+                      =1   133                                         ; b in row 1
+  0071                =1   134     KEY_PRESS_8 EQU          071H       ; key press corresponding to a value of 
+                      =1   135                                         ; 7 in row 1
+                      =1   136           
+  00E2                =1   137     KEY_PRESS_9 EQU           0E2H      ; key press corresponding to a value of 
+                      =1   138                                         ; e in row 2
+  00D2                =1   139     KEY_PRESS_10 EQU          0D2H      ; key press corresponding to a value of 
+                      =1   140                                         ; d in row 2 
+  00B2                =1   141     KEY_PRESS_11 EQU          0B2H      ; key press corresponding to a value of 
+                      =1   142                                         ; b in row 2
+  0072                =1   143     KEY_PRESS_12 EQU          072H      ; key press corresponding to a value of 
+                      =1   144                                         ; 7 in row 2
+                      =1   145           
+  00E3                =1   146     KEY_PRESS_13 EQU          0E3H      ; key press corresponding to a value of 
+                      =1   147                                         ; e in row 3 
+  00D3                =1   148     KEY_PRESS_14 EQU          0D3H      ; key press corresponding to a value of 
+                      =1   149                                         ; d in row 34 
+  00B3                =1   150     KEY_PRESS_15 EQU          0B3H      ; key press corresponding to a value of 
+                      =1   151                                         ; b in row 3
+  0073                =1   152     KEY_PRESS_16 EQU          073H      ; key press corresponding to a value of 
+                      =1   153                                         ; e in row 3
+                      =1   154     
+                           155 +1  $INCLUDE(queues.inc)
+                      =1   156     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   157     ;                                  QUEUES.INC                                ;  
+                      =1   158     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   159     
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   160     ; This file contains constants for the functions needed to initialize and use
+                      =1   161     ; a queue (which are defined in queues.asm)
+                      =1   162     ;
+                      =1   163     ; Revision History:
+                      =1   164     ;    10/22/16  Meera Krishnamoorthy updated constants/ queue structure
+                      =1   165     
+                      =1   166     
+  0201                =1   167     queue_size equ 513 ; this variable describes the size of the queue
+  0002                =1   168     word_len equ 2 ; the size of a word is 2x the size of a bytes
+  0001                =1   169     byte_len equ 1 ; the size of a byte is set to "1"
+                      =1   170     
+                      =1   171     ; The following structure creates a queue with the following attributes:
+                      =1   172     ; 1) len: the total length the queue can be
+                      =1   173     ; 2) element_size: if this variable is 0, the element size is bytes. if this
+                      =1   174     ;                  variable is 1, then the element size is words.
+                      =1   175     ; 3) front: head pointer for queue
+                      =1   176     ; 4) rear: tail pointer for queue
+                      =1   177     ; 5) elements: the array to put all elements of the queue in 
+                      =1   178     ; 
+----                  =1   179     QueueStruct         STRUC
+0000                  =1   180         len             DW      ?
+0002                  =1   181         element_size    DW      ?
+0004                  =1   182         front           DW      ?
+0006                  =1   183         rear            DW      ?
+0008                  =1   184         elements        DB      (queue_size) DUP (?)
+----                  =1   185     QueueStruct ENDS
+                           186 +1  $INCLUDE(simpmac.inc)
+                      =1   187 +1  $NOLIST
+                           559 +1  $INCLUDE(display.inc)
+                      =1   560     ; DISPLAY.INC
+                      =1   561     ; This file contains the constants for the functions in "display.asm", three
+                      =1   562     ; of which are used to convert decimal/hexadecimal numbers into segment patterns,
+                      =1   563     ; and two of which are used to display those segment patterns on the board
+                      =1   564     
+                      =1   565     
+                      =1   566     ; Revision History:
+                      =1   567     ;    10/30/16  Meera Krishnamoorthy wrote constants
+                      =1   568     
+  0000                =1   569     ASCII_NULL      equ 0           ;used to check if the string was terminated
+  0008                =1   570     DISPLAY_LEN     equ 8           ;the number of characters that can be displayed
+                      =1   571                                     ;on the display
+  0000                =1   572     LEDDisplay      equ 0000H       ;display address
+                           573 +1  $INCLUDE(main10.inc)
+                      =1   574     ; MAIN10.INC
+                      =1   575     ; This contains all of the constants needed to run the motor main loop.
+                      =1   576     
+                      =1   577     ; constants to create update string 
+  0004                =1   578     SPEED_SIZE EQU 4    ; the maximum number of hexadecimal bytes needed
+                      =1   579                         ; to display the speed of the robotrike
+                      =1   580                         
+  0003                =1   581     ANGLE_SIZE EQU 3    ; the maximum number of hexadecimal bytes needed
+                      =1   582                         ; to display the direction (angle) of the robotrike
+                      =1   583                         
+  0020                =1   584     ASCII_SPACE EQU 32  ; ascii value for space (used in update string
+                      =1   585                         ; to separate the speed from the angle)
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           586     
+                           587     ASSUME  CS:CGROUP, DS:DGROUP
+                           588     
+                           589     ; Function Name: InitEventQueue
+                           590     ; Description: This function initializes the event queue using a pre-existing
+                           591     ; function QueueInit. The reason that this function exists is to specify
+                           592     ; the address of the event queue, so that motor functions can access
+                           593     ; the event queue without the event queue having to become a
+                           594     ; global structure.
+                           595     ;
+                           596     ; Operational Description: This function does this by setting up the registers
+                           597     ; appropriately (with the address of the queue in SI, the length of the
+                           598     ; queue in AX, and the element size in BX), and then calling the
+                           599     ; already existing function QueueInit to create a queue structure.
+                           600     ;
+                           601     ; Arguments: AX: length of queue
+                           602     ;            BX: element size
+                           603     ;            SI: address of queue
+                           604     ; Return Values: None.
+                           605     ; Global Variables: None.
+                           606     ; Shared Variables: None.
+                           607     ; Local Variables: None.
+                           608     ;
+                           609     ; Inputs: None.
+                           610     ; Outputs: None.
+                           611     ; User Interface: None.
+                           612     ; Error Handling: None.
+                           613     ; Algorithms: None.
+                           614     ;
+                           615     ; Data Structures: None.
+                           616     ; Limitations: None.
+                           617     ; Known Bugs: None.
+                           618     ; Registers used:
+                           619     ;
+                           620     ; Author: Meera Krishnamoorthy
+                           621     ; Last Modified: 12/5/16
+                           622     ;
+                           623     
+0000                       624     InitEventQueue      PROC        NEAR
+                           625             PUBLIC      InitEventQueue
+                           626             
+0000 8D360A00       R      627     LEA SI, EventQueue ; sets address of queue to be event queue
+0004 B80004                628     MOV AX, EVENTQUEUE_SIZE ; sets queue size
+0007 BB0200                629     MOV BX, word_len ; sets element size of queue to be words
+000A E80000         E      630     CALL QueueInit ; calls function to initialize event queue
+                           631     
+000D C3                    632     RET
+                           633     
+                           634     InitEventQueue  ENDP
+                           635     
+                           636     
+                           637     
+                           638     ; EnqueueEvent
+                           639     ; Description: This function enqueues an event to the event queue, assuming
+                           640     ; that the value to be enqueued is in AX. If the queue is full, it
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           641     ; sets the critical flag (which is used in the main loop
+                           642     ; to determine whether to reset all values (in the case that the event
+                           643     ; queue is full). 
+                           644     ; The reason that this function exists is to specify
+                           645     ; the address of the event queue, so that motor functions can access
+                           646     ; the event queue without the event queue having to become a global structure.
+                           647     ;
+                           648     ; Operational Description: This function begins by checking if the queue is 
+                           649     ; full. If the queue is full, instead of trying to enqueue to
+                           650     ; it, this function sets the critical flag variable to a special constant
+                           651     ; that will be used in the main loop to determine whether to reset
+                           652     ; the main loop. Then, it puts the address of the event queue in SI and
+                           653     ; the value to be enqueued in AX, and calls the already written function 
+                           654     ; Enqueue to enqueue AX to the event queue. 
+                           655     ;
+                           656     ; Arguments: AX: value to enqueue to the event queue
+                           657     ; Return Values: None.
+                           658     ; Global Variables: None.
+                           659     ; Shared Variables: criticalflag: set if the event queue is full (used to 
+                           660     ;                             check if the main loop has to restart. size: word,
+                           661     ;                             type: W
+                           662     ; Local Variables: None.
+                           663     ;
+                           664     ; Inputs: None.
+                           665     ; Outputs: None.
+                           666     ; User Interface: None.
+                           667     ; Error Handling: None.
+                           668     ; Algorithms: None.
+                           669     ;
+                           670     ; Data Structures: EventQueue: type: words, size: EVENTQUEUE_SIZE, 
+                           671     ;                       holds all key press/ serial events
+                           672     ; Limitations: None.
+                           673     ; Known Bugs: None.
+                           674     ; Registers used: CX, AX, SI
+                           675     ;
+                           676     ; Author: Meera Krishnamoorthy
+                           677     ; Last Modified: 12/5/16
+                           678     ;
+                           679     
+000E                       680     EnqueueEvent      PROC        NEAR
+                           681             PUBLIC      EnqueueEvent
+                           682     
+000E                       683     InitEnqueueEvent:
+000E 8BC8                  684         MOV CX, AX   ; saves value of AX (value to enqueue to event)
+                           685                      ; because queue full changes values of AX
+0010 8D360A00       R      686         LEA SI, EventQueue ; sets SI to address of event queue (because it
+                           687                            ; is an argument of QueueFull)
+0014 E80000         E      688         CALL QueueFull ; checks if the queue is full. sets the zero
+                           689                        ; flag if the queue is full, and resets it if
+                           690                        ; queue is not full
+0017 7509                  691         JNZ CanEnqueue  ; if queue is not full (zero flag is reset), can enqueue
+                           692                        ; to the queue
+0019 C70613027B00   R      693         MOV criticalflag, CRITICAL_FLAG ; if queue is full, should set critical
+                           694                                         ; flag (which will be used in main loop
+                           695                                         ; to check if we need to restart
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           696                                         ; our system)
+001F EB0A90                697         JMP EndEnqueueEvent  ; after setting critical flag, jump to end
+                           698         
+0022                       699     CanEnqueue:
+0022 8BC1                  700         MOV AX, CX ; get back value to enqueue to event queue (was saved in
+                           701                    ; CX at the beginning of this function)
+0024 8D360A00       R      702         LEA SI, EventQueue ; sets SI to address of event queue (because
+                           703                            ; that is how queue full is called)
+0028 E80000         E      704         CALL Enqueue ; enqueues to the event queue
+                           705         
+002B                       706     EndEnqueueEvent:
+002B C3                    707         RET
+                           708     
+                           709     EnqueueEvent    ENDP
+                           710     
+                           711     
+                           712     ; Function Name: DequeueEventMotor
+                           713     ; Description: This function dequeues an event from the event queue.
+                           714     ; The reason that this function exists is to specify
+                           715     ; the address of the event queue, so that motor functions can access
+                           716     ; the event queue without the event queue having to become a global structure.
+                           717     ;
+                           718     ; Operational Description: This function does this by first checking if the
+                           719     ; queue is empty. If it is, we do not dequeue, and instead call a function
+                           720     ; that simply returns (to delay return back to
+                           721     ; main loop). If we can dequeue, we dequeue from the event queue,
+                           722     ; and based on the type of event dequeued (which is stored in AH -- the
+                           723     ; event queue is a word queue, which stores event types in AH and event
+                           724     ; values in AL), it calls an appropriate function to deal with that
+                           725     ; error. This is done using the call table MotorTable which is indexed
+                           726     ; by event types. 
+                           727     ;
+                           728     ; Arguments: None.
+                           729     ; Return Values: None.
+                           730     ; Global Variables: None.
+                           731     ; Shared Variables: None.
+                           732     ; Local Variables: None.
+                           733     ;
+                           734     ; Inputs: None.
+                           735     ; Outputs: None.
+                           736     ; User Interface: None.
+                           737     ; Error Handling: None.
+                           738     ; Algorithms: None.
+                           739     ;
+                           740     ; Data Structures:  EventQueue: type: words, size: EVENTQUEUE_SIZE, 
+                           741     ;                       holds all key press/ serial events
+                           742     ;                   MotorTable, type: word, length: 4 elements: is a call
+                           743     ;                       table that is indexed by event type -- calls
+                           744     ;                       the appropriate function to deal with each event
+                           745     ; Limitations: None.
+                           746     ; Known Bugs: None.
+                           747     ; Registers used: SI, flags
+                           748     ;
+                           749     ; Author: Meera Krishnamoorthy
+                           750     ; Last Modified: 12/5/16
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           751     ;
+                           752     
+002C                       753     DequeueEventMotor      PROC        NEAR
+                           754             PUBLIC      DequeueEventMotor
+                           755     
+002C                       756     InitDequeueEvent:
+002C 8D360A00       R      757         LEA SI, EventQueue ; sets SI to address of event queue (it is an   
+                           758                            ; argument of QueueEmpty)
+0030 E80000         E      759         CALL QueueEmpty ; check if the queue is empty
+0033 7506                  760         JNZ CanDequeue ; if queue is not empty, dequeue
+                           761                        ; we do this because if the queue is empty and we try
+                           762                        ; to dequeue, our code will enter a blocking function
+                           763                        ; that it will not be able to get out of.
+                           764                        ; thus we must check if the queue is empty before we
+                           765                        ; actually dequeue. 
+0035                       766     ResetAX: ; if queue is empty, we call a special function
+                           767              ; to delay us from re-entering our main loop (which would prevent
+                           768              ; faster enqueues). this function is indexed in the motor table
+                           769              ; (which calls functions based on the event constant of 
+                           770              ; queues) with QUEUE_EMPTY_CONSTANT.
+0035 BB0600                771         MOV BX, QUEUE_EMPTY_CONST ; set BX to be QUEUE_EMPTY_CONSTANT
+0038 EB0F90                772         JMP CallDequeueFunc ; call special function to delay from 
+                           773                             ; re-entering main loop
+003B                       774     CanDequeue: 
+003B 8D360A00       R      775         LEA SI, EventQueue ; sets SI to address of event queue (it is an argument
+                           776                            ; of Dequeue)
+003F E80000         E      777         CALL Dequeue ; dequeues a value of the event queue
+0042 BB0000                778         MOV BX, 0 ; clear upper byte of BX (used to index motor table)
+0045 86DC                  779         XCHG BL, AH ; moves the event type into BL so that it can index table
+                           780                     ; also now high bit of AH is cleared so AL (event value)
+                           781                     ; which is only necessary information is the only thing
+                           782                     ; remaining
+                           783                     
+                           784                     ; all functions in the Motor Table are called with AL as
+                           785                     ; an argument, and are indexed by BX
+                           786     
+0047 D0E3                  787         SHL BL, 1   ; the motor table is a word table, so need to shift
+                           788                     ; index before calling table
+                           789         
+0049                       790     CallDequeueFunc:
+0049 2EFF976201     R      791         CALL CS:MotorTable[BX] ; calls function associated with
+                           792                                 ; each event type to deal with those events
+                           793     
+004E                       794     EndDequeueEventMotor:
+004E C3                    795         RET
+                           796     
+                           797     DequeueEventMotor       ENDP
+                           798     
+                           799     
+                           800     
+                           801     
+                           802     ; Function Name: InitMotorFunct
+                           803     ; Description: This function initializes all shared variables used in the
+                           804     ; functions to handle keypress events and serial events.
+                           805     ;
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           806     ; Operational Description: This is done by zeroing the values of all the
+                           807     ; shared variables. 
+                           808     ;
+                           809     ; Arguments: None. 
+                           810     ; Return Values: None.
+                           811     ; Global Variables: None.
+                           812     ; Shared Variables: motorindex: used to index the string created
+                           813     ;                            in serialputchar because these strings
+                           814     ;                            are all fixed length, and the function
+                           815     ;                            returns once a fixed number of characters
+                           816     ;                            has been sent to the serial port. size: word,
+                           817     ;                             type: W
+                           818     ;                   criticalflag: set if the event queue is full (used to 
+                           819     ;                             check if the main loop has to restart. size: word,
+                           820     ;                             type: W
+                           821     ;                   errorflag: set if a serial error occurs (so no data
+                           822     ;                             can be received from the serial. size: word,
+                           823     ;                             type: W
+                           824     ;                                       segmentchange: set if a string to be sent to 
+                                   the
+                           825     ;                                                         remote side is in the data 
+                                   segment 
+                           826     ;                                                         instead of the code segment
+                                   . size: word,
+                           827     ;                             type: W
+                           828     ;                                       dispmotorbuffer: this string buffer is used
+                           829     ;                                                         to create string with the R
+                                   obotrike's
+                           830     ;                                                         updated speed and direction
+                                   .
+                           831     ;                                                         it is sent to the robotrike
+                                    after
+                           832     ;                                                         this program processes a se
+                                   rial command
+                           833     ;                                                         and changes the speed/ angl
+                                   e/laser status
+                           834     ;                                                         of the type. size: DISPLAY_
+                                   LEN, type: byte
+                           835     ;                   
+                           836     ; Local Variables: None.
+                           837     ;
+                           838     ; Inputs: None.
+                           839     ; Outputs: None.
+                           840     ; User Interface: None.
+                           841     ; Error Handling: None.
+                           842     ; Algorithms: None.
+                           843     ;
+                           844     ; Data Structures: None.
+                           845     ; Limitations: None.
+                           846     ; Known Bugs: None.
+                           847     ; Registers used:
+                           848     ;
+                           849     ; Author: Meera Krishnamoorthy
+                           850     ; Last Modified: 12/5/16
+                           851     ;
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           852     
+004F                       853     InitMotorFunct      PROC        NEAR
+                           854             PUBLIC      InitMotorFunct
+                           855             
+004F C70608000000   R      856     MOV motorindex, 0 ; sets index for sending serial strings to 0
+0055 C70613020000   R      857     MOV criticalflag, 0 ; sets critical flag to 0 
+005B C60600000090   R      858     MOV dispmotorbuffer, 0 ; sets sending motor buffer to 0
+0061 C60615020090   R      859     MOV errorflag, 0 ; sets the error flag to 0
+0067 C70616020000   R      860     MOV segmentchange, 0 ; sets the default segment from which to get strings
+                           861                                          ; to send serially to the remote side to the cod
+                                   e
+                           862                                              ; segment
+                           863     
+006D C3                    864     RET
+                           865     
+                           866     InitMotorFunct  ENDP
+                           867     
+                           868     ; GetError
+                           869     ; Description: This function is called whenever a Line Status Interrupt
+                           870     ; occurs (they occur when a serial error happens). Once a 
+                           871     ; Line Status Interrupt occurs, a previously written function
+                           872     ; enqueues an event to the event queue signifying that
+                           873     ; this happened. When that event is dequeued, this
+                           874     ; function is called. This function sends a string to serial indicating
+                           875     ; the type of serial error that occured (so that the remote unit can display it)
+                           876     ; using a table that is indexed based on the value of the error
+                           877     ; event (which is the value of the Line Status Register). 
+                           878     ;
+                           879     ; Operational Description: This is done by first setting the shared
+                           880     ; variable errorflag to ERROR_FLAG_VAL so nothing can be sent/received from the
+                           881     ; serial port until an error message is sent to the serial ports. 
+                           882     ; Then, it checks if the value
+                           883     ; of the event (sent in AL) corresponds to an index in the error table. If it 
+                           884     ; does, then we get the string corresponding to that index of the table
+                           885     ; and send this string to the serial ports (so the remote unit can
+                           886     ; display the string.
+                           887     ; If it is not, we display that a generic error has occurred, because
+                           888     ; it is not one that is in our table. 
+                           889     ;
+                           890     ; Arguments: AL: value of line status register (tells you what
+                           891     ;            error has occurred)
+                           892     ; Return Values: None.
+                           893     ; Global Variables: None.
+                           894     ; Shared Variables: errorflag: set if a serial error occurs (so no data
+                           895     ;                              can be received from the serial after
+                           896     ;                              error occurs). size: word, type: R/W
+                           897     ;                                       segmentchange: set if a string to be sent to 
+                                   the
+                           898     ;                                                         remote side is in the data 
+                                   segment 
+                           899     ;                                                         instead of the code segment
+                                   . size: word,
+                           900     ;                             type: W, type: R/W
+                           901     ; Local Variables: None.
+                           902     ;
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           903     ; Inputs: None.
+                           904     ; Outputs: None. 
+                           905     ; User Interface: Displays error message on display
+                           906     ; Error Handling: None.
+                           907     ; Algorithms: None.
+                           908     ;
+                           909     ; Data Structures: ErrorTable: type: byte, has strings to display
+                           910     ;                      on the display for each error
+                           911     ; Limitations: The error table does not account for every possible
+                           912     ;              error that could occur, thus we can sometimes display
+                           913     ;              that a generic error occurred.
+                           914     ; Known Bugs: None.
+                           915     ; Registers used: None. 
+                           916     ;
+                           917     ; Author: Meera Krishnamoorthy
+                           918     ; Last Modified: 12/5/16
+                           919     ;
+                           920     
+006E                       921     GetError      PROC        NEAR
+                           922             PUBLIC      GetError
+006E                       923     CheckValidResult: ; check if lsr value is in error table
+006E C60615024290   R      924         MOV errorflag, ERROR_FLAG_VAL ; does this to make sure no received data
+                           925                                       ; is displayed
+0074 8AC8                  926         MOV CL, AL ; move lsr value to CL (because will be modified)
+0076 80F900                927         CMP CL, 0 ; there is no table value corresponding to lsr = "0" so display
+                           928                   ; that unidentified error occurred
+0079 742E                  929         JE DisplayUnIdentifiedError
+                           930         
+007B 80F918                931         CMP CL, MAX_ERROR_TABLE_VAL ; check if lsr value is greater than the number
+                           932                                     ; of elements in the error table
+007E 7D29                  933         JGE DisplayUnIdentifiedError ; there is no table value corresponding to 
+                           934                                      ; these values of lsr so display
+                           935                                      ; that unidentified error occurred
+                           936         ; this checks if the lsr is negative because the lsr should be 
+                           937         ; a multiple of 2
+0080 80E101                938         AND CL, 1 ; gets rid of all bytes except the last byte (which would
+                           939                   ; only be set if a number is odd
+0083 80F901                940         CMP CL, 1 ; checks if the last bit is set 
+0086 7421                  941         JE DisplayUnIdentifiedError ; if last bit is set, then not even, 
+                           942                                     ; not a valid result
+                           943         
+0088                       944     FindErrorString:
+0088 D0E8                  945         SHR AL, 1 ; error table is indexed by bytes (that are a factor of 2 
+                           946                   ; lower than the lsr value), thus need to divide by 2
+                           947                   ; to index it
+008A 8D367201       R      948         LEA SI, ErrorTable
+                           949         ; AL contains the error 
+008E B400                  950         MOV AH, 0 ; AL: only important information
+                           951                   ; make sure AH is 0 before multiplying by DISPLAY_LEN
+0090 BB0800                952         MOV BX, DISPLAY_LEN ; moves into BX the length of the display (which
+                           953                             ; is the length of all 
+0093 F7E3                  954         MUL BX
+0095 03F0                  955         ADD SI, AX ; now SI contains address of table offset with correct thing
+                           956                    ; to display
+                           957         
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0097 C70616020000   R      958         MOV segmentchange, 0 ; table is in the code segment, so set 
+                           959                                                      ; segmentchange to 0 (so that the er
+                                   ror message
+                           960                                                      ; is outputted from CS:SI)
+009D E85A00                961         Call SerialPutString ; sends error message to remote unit
+00A0 C60615020090   R      962         MOV errorflag, 0 ; can clear error flag now that error message
+                           963                                          ; has been sent
+00A6 EB1490                964         JMP EndGetError
+                           965         
+00A9                       966     DisplayUnIdentifiedError:
+00A9 8D367201       R      967         LEA SI, ErrorTable ; if error is unidentified, display 
+                           968                            ; that generic error has occurred (we have set
+                           969                            ; the generic error to be the first index
+                           970                            ; of the table, so the table address points
+                           971                            ; to this string
+                           972         
+00AD C70616020000   R      973         MOV segmentchange, 0 ; table is in the code segment, so set 
+                           974                                                      ; segmentchange to 0 (so that the er
+                                   ror message
+                           975                                                      ; is outputted from CS:SI)
+00B3 E84400                976         Call SerialPutString   ; sends error message to remote unit
+00B6 C60615020090   R      977         MOV errorflag, 0 ; can clear error flag now that error message
+                           978                                          ; has been sent
+00BC                       979     EndGetError: 
+00BC C3                    980         RET
+                           981      
+00BD C3                    982     RET
+                           983     
+                           984     GetError        ENDP
+                           985     
+                           986     
+                           987     ; GetReceivedData
+                           988     ; Description: This function responds to strings sent to it from the
+                           989     ; remote side. These strings should be in the form of commands that
+                           990     ; ParseSerialChar (a previously written function) can use to
+                           991     ; call motor functions to change the speed/direction/laser status of the
+                           992     ; RoboTrike. This function parses each character sent to it. If the
+                           993     ; parsing of any character successful (the character is not part of a command
+                           994     ; that can be used to call motor functions), a parsing error message
+                           995     ; will be sent to the remote unit. Otherwise, parsing will continue
+                           996     ; until this function receives a carriage return, which signals
+                           997     ; the end of a command. Once a carriage return is hit, this function
+                           998     ; calls another function to display the new status of the Robotrike
+                           999     ; (updated speed/ direction). 
+                          1000     ;
+                          1001     ; Operational Description: This is done by calling ParseSerialChar
+                          1002     ; each time a character is received. ParseSerialChar outputs a 0
+                          1003     ; value in AX if the parsing is successful and a non zero value in AX
+                          1004     ; if the parsing is unsuccessful. If AX != 0, an error message
+                          1005     ; is sent to the serial ports using SerialPutSring. Else, if
+                          1006     ; the parsed character is not a carriage return, this function returns.
+                          1007     ; If the parsed character is a carriage return (and no parsing
+                          1008     ; errors occurred), this means the command has ended. Once the command ended,
+                          1009     ; the function DisplayMotorInfo is called to send the updated
+                          1010     ; speed/ direction of the RoboTrike to the remote side to be displayed. 
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1011     ;
+                          1012     ; Arguments: AL: received character that will be added to the string
+                          1013     ;            buffer and displayed once a carriage return is
+                          1014     ;            hit
+                          1015     ; Return Values: None.
+                          1016     ; Global Variables: None.
+                          1017     ; Shared Variables: errorflag: set if a serial error occurs (so no data
+                          1018     ;                              can be received from the serial after
+                          1019     ;                              error occurs). size: word, type: R/W
+                          1020     ;                                       segmentchange: set if a string to be sent to 
+                                   the
+                          1021     ;                                                         remote side is in the data 
+                                   segment 
+                          1022     ;                                                         instead of the code segment
+                                   . size: word,
+                          1023     ;                             type: W
+                          1024     ;                                       dispmotorbuffer: this string buffer is used
+                          1025     ;                                                         to create string with the R
+                                   obotrike's
+                          1026     ;                                                         updated speed and direction
+                                   .
+                          1027     ;                                                         it is sent to the robotrike
+                                    after
+                          1028     ;                                                         this program processes a se
+                                   rial command
+                          1029     ;                                                         and changes the speed/ angl
+                                   e/laser status
+                          1030     ;                                                         of the type. size: DISPLAY_
+                                   LEN, type: byte
+                          1031     ; Local Variables: None.
+                          1032     ;
+                          1033     ; Inputs: None.
+                          1034     ; Outputs: None.
+                          1035     ; User Interface: None.
+                          1036     ; Error Handling: If the error flag is set (a serial error occurred), 
+                          1037     ;                 no received data can be displayed. The system
+                          1038     ;                 must be reloaded for serial data to be sent to display. 
+                          1039     ; Algorithms: None.
+                          1040     ;
+                          1041     ; Data Structures: None.
+                          1042     ; Limitations: 
+                          1043     ; Known Bugs: None.
+                          1044     ; Registers used:
+                          1045     ;
+                          1046     ; Author: Meera Krishnamoorthy
+                          1047     ; Last Modified: 12/5/16
+                          1048     ;
+                          1049     
+00BE                      1050     GetReceivedData      PROC        NEAR
+                          1051             PUBLIC      GetReceivedData
+00BE                      1052     IntGetReceivedData: 
+00BE 803E150242     R     1053         CMP errorflag, ERROR_FLAG_VAL ; if the error flag is set (meaning
+                          1054                                       ; a serial error occurred), this 
+                          1055                                       ; ensures that the string that
+                          1056                                       ; follows is not displayed until
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   14
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1057                                                                       ; an error message 
+                                   is outputted
+00C3 7434                 1058         JE EndGetReceivedData 
+                          1059             
+00C5 60                   1060             PUSHA
+00C6 E80000         E     1061             Call ParseSerialChar ; parses received character (uses a state machine
+                          1062                                                  ; to parse characters received until it 
+                                   processes
+                          1063                                                      ; a command. if it successfully proc
+                                   esses a command,
+                          1064                                                      ; it will call a motor function (eit
+                                   her change the 
+                          1065                                                      ; speed/ direction of the robotrike 
+                                   or laser status). 
+00C9 3D0000               1066             CMP AX, 0 ; ParseSerialChar puts a non-zero value in AX if the
+                          1067                               ; parsing is unsuccessful. we use AX to check if a parsing
+                          1068                               ; error has occurred
+00CC 61                   1069             POPA
+00CD 751A                 1070             JNE ParseError ; if a parsing error has occurred (AX != 0), we 
+                          1071                                        ; send an error message to the remote side to disp
+                                   lay
+                          1072             
+00CF 3C0D                 1073         CMP AL, CARRIAGE_RETURN ; if no parsing error occurs, then we check if
+                          1074                                                             ; the inputted character is a
+                                    carriage return 
+                          1075                                                             ; (this signals end of comman
+                                   d)
+00D1 7526                 1076         JNE EndGetReceivedData      ; if we have not reached the end of a command,
+                          1077                                                             ; we simply return
+                          1078     
+00D3                      1079     DisplayReceivedData:            ; else, we display a status update indicating
+                          1080                                                             ; what the command sent in ch
+                                   anged (either
+                          1081                                                             ; the speed/direction of the 
+                                   robotrike, or
+                          1082                                                             ; the laser status)
+                          1083                                                             
+                          1084 +1      
+00D3 9C                   1085 +1          PUSHF                           ;save flags
+00D4 FA                   1086 +1          CLI                             ;disable the interrupts
+                          1087 +1                          ; we call critical start/ end to make sure
+                          1088                                                             ; the update string gets conc
+                                   atenated without 
+                          1089                                                             ; interrupts affecting the co
+                                   ncatenation
+                          1090                                                             
+00D5 E85300               1091             Call DisplayMotorInfo   ; this function concatenates a string
+                          1092                                                             ; to be sent to the remote si
+                                   de to display
+                          1093                                                             ; with the updated speed/ dir
+                                   ection of the robotrike
+                          1094                                                             
+                          1095 +1          
+00D8 9D                   1096 +1          POPF                            ;restore flags (interrupt flag in particular)
+                          1097 +1  
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   15
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00D9 8D360000       R     1098             LEA SI, dispmotorbuffer ; the update string is stored by DisplayMotorInfo
+                          1099                                                             ; in dispmotorbuffer. we then
+                                    send this string 
+                          1100                                                             ; to the remote side using Se
+                                   rialPutStringMotor
+                          1101             
+00DD C70616020100   R     1102         MOV segmentchange, 1 ; dispmotorbuffer is in data segment, so set
+                          1103                                                      ; segmentchange to 1 (so that update
+                                    string
+                          1104                                                      ; is outputted from DS:SI)
+00E3 E81400               1105         Call SerialPutString ; this function sends the update string
+                          1106                                                               ; to the remote side
+                          1107                                                               
+00E6 EB1190               1108         JMP EndGetReceivedData
+                          1109     
+00E9                      1110     ParseError:
+00E9 8D366A01       R     1111             LEA SI, MotorErrors      ; if a parsing error occurs, we send
+                          1112                                                              ; the first entry of the Mot
+                                   orErrorTable
+                          1113                                                              ; to the remote side using S
+                                   erialPutString
+                          1114     
+00ED C70616020000   R     1115         MOV segmentchange, 0     ; table is in the code segment, so set 
+                          1116                                                              ; segmentchange to 0 (so tha
+                                   t the error message
+                          1117                                                          ; is outputted from CS:SI)
+00F3 E80400               1118         Call SerialPutString   ; this sends a message to the serial side 
+                          1119                                                        ; stating that a parsing error has
+                                    occurred
+00F6 EB0190               1120             JMP EndGetReceivedData
+                          1121             
+00F9                      1122     EndGetReceivedData: 
+00F9 C3                   1123         RET
+                          1124     
+                          1125     GetReceivedData ENDP
+                          1126     
+                          1127     
+                          1128     ; SerialPutString
+                          1129     ; Description: This function sends a series of characters over the serial
+                          1130     ; channel from the motor unit to the remote unit. It expects CS:SI or
+                          1131     ; DS:SI (based on the value of the shared variable segmentchange) to be
+                          1132     ; the location of the string to send over serial, and loops through
+                          1133     ; SI until it reaches the end of the string (all strings are a fixed length,
+                          1134     ; which is how we know we have reached the end of the string). 
+                          1135     ;
+                          1136     ; Operational Description: This is done using the shared variable motor
+                          1137     ; index to keep track of how much of the string has been sent to
+                          1138     ; the serial port. The string is stored in CS:SI or DS:SI (based on the
+                          1139     ; value of the shared variable segmentchange, and we send characters
+                          1140     ; in the string over serial using the already written function
+                          1141     ; SerialPutChar. This function continues
+                          1142     ; to call SerialPutChar until all characters in the string have been sent
+                          1143     ; over (the motor index is set to be the length of a string). 
+                          1144     ; Then it adds a carriage return to the end of the string (because
+                          1145     ; that's how the parser knows the command is done) and calls SerialPutChar.
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   16
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1146     ;
+                          1147     ; Arguments: CS:[SI] - address of string to send serially
+                          1148     ; Return Values: None.
+                          1149     ; Global Variables: None.
+                          1150     ; Shared Variables:  motorindex: used to index the string created
+                          1151     ;                            in serialputchar because these strings
+                          1152     ;                            are all fixed length, and the function
+                          1153     ;                            returns once a fixed number of characters
+                          1154     ;                            has been sent to the serial port. size: word,
+                          1155     ;                             type: R/W
+                          1156     ; Local Variables: None.
+                          1157     ;
+                          1158     ; Inputs: None.
+                          1159     ; Outputs: None.
+                          1160     ; User Interface: None.
+                          1161     ; Error Handling: None.
+                          1162     ; Algorithms: None.
+                          1163     ;
+                          1164     ; Data Structures: None.
+                          1165     ; Limitations: None.
+                          1166     ; Known Bugs: None.
+                          1167     ; Registers used: AX, SI
+                          1168     ;
+                          1169     ; Author: Meera Krishnamoorthy
+                          1170     ; Last Modified: 10/17/16
+                          1171     ;
+                          1172     
+00FA                      1173     SerialPutString   PROC        NEAR
+                          1174             PUBLIC      SerialPutString
+00FA                      1175     ContSerialPutStringMotor: 
+00FA 8A04                 1176         MOV AL, DS:[SI]  ; gets current character to send to the serial port
+                          1177                                              ; from DS:SI
+                          1178                          ; (all the characters are sent to SI before this
+                          1179                          ; function is called)
+00FC 833E160200     R     1180         CMP segmentchange, 0 ; check if code segment should be default segment
+                          1181                                                      ; (segmentchange will be 0 if CS is 
+                                   segment to
+                          1182                                                      ; send string from)
+0101 7503                 1183         JNE AddSerialString ; if not, don't change segment to code segment
+0103                      1184     ChangeSegments: 
+0103 2E8A04               1185         MOV AL, CS:[SI]  ; gets current character to send to the serial port
+                          1186                                              ; from CS:SI (because that is where the stri
+                                   ng
+                          1187                                              ; is stored)
+                          1188                          ; (all the characters are sent to SI before this
+                          1189                          ; function is called)
+0106                      1190     AddSerialString:
+0106 46                   1191         INC SI   ; SI is incremented (to move on to next character)
+0107 FF060800       R     1192         INC motorindex  ; motor index is incremented (keeps track of 
+                          1193                          ; how many characters have been sent to serial
+                          1194                          ; because all the strings are the same length,
+                          1195                          ; and this allows us to keep track of when an entire
+                          1196                          ; string has been sent
+                          1197         
+010B 833E080009     R     1198         CMP motorindex, DISPLAY_LEN + 1 ; all strings are of DISPLAY_LEN
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   17
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1199                                          ; length
+0110 7F07                 1200         JG CheckSerialPutStringMotor ; if the motor index is DISPLAY_LEN,
+                          1201                                       ; means entire string has been sent to the
+                          1202                                       ; serial, so can return
+0112 56                   1203         PUSH SI ; if entire string has not been sent, need to send this new
+                          1204                 ; character to the serial port
+                          1205                 ; save value of SI because this contains address of string,
+                          1206                 ; and is changed in serialputchar
+0113 E80000         E     1207         Call SerialPutChar ; calls function to put characters over string
+0116 5E                   1208         POP SI ; gets back address of string to send to serial
+0117 EBE1                 1209         JMP ContSerialPutStringMotor ; continue looping to get more characters
+                          1210                                       ; to send to serial because have not sent
+                          1211                                       ; entire string yet
+                          1212         
+0119                      1213     CheckSerialPutStringMotor: 
+0119 B00D                 1214         MOV AL, CARRIAGE_RETURN ; add carriage return to end of string at end
+                          1215                                 ; because this is how the motor reads strings
+                          1216                                 ; in (knows they are done)
+011B E80000         E     1217         Call SerialPutChar ; send carriage return to serial to join rest of string
+011E C70608000000   R     1218         MOV motorindex, 0 ; reset motor index to index new string to send to serial
+0124 C70616020000   R     1219         MOV segmentchange, 0 ; table is in the code segment, so set 
+                          1220                                                  ; segmentchange to 0 (so that the error 
+                                   message
+                          1221                                                      ; is outputted from CS:SI)
+012A                      1222     EndSerialPutStringMotor:
+012A C3                   1223         RET
+                          1224     
+                          1225     
+                          1226     SerialPutString ENDP
+                          1227     
+                          1228     
+                          1229     ; DisplayMotorInfo
+                          1230     ; Description: This function creates a string containing the current
+                          1231     ; speed and direction of the Robotrike in the shared variable
+                          1232     ; dispmotorbuffer. 
+                          1233     ;
+                          1234     ; Operational Description: This is done using the functions GetMotorSpeed
+                          1235     ; and GetMotorDirection to get the speed and direction of the Robotrike.
+                          1236     ; Then, this function uses Hex2String to convert these numeric values
+                          1237     ; into strings, and sends those strings to the remote unit to display
+                          1238     ; via SerialPutString. 
+                          1239     ;
+                          1240     ; Arguments: 
+                          1241     ; Return Values: None.
+                          1242     ; Global Variables: None.
+                          1243     ; Shared Variables: dispmotorbuffer: this string buffer is used
+                          1244     ;                                                         to create string with the R
+                                   obotrike's
+                          1245     ;                                                         updated speed and direction
+                                   .
+                          1246     ;                                                         it is sent to the robotrike
+                                    after
+                          1247     ;                                                         this program processes a se
+                                   rial command
+                          1248     ;                                                         and changes the speed/ angl
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   18
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                                   e/laser status
+                          1249     ;                                                         of the type. size: DISPLAY_
+                                   LEN, type: byte 
+                          1250     ; Local Variables: None.
+                          1251     ;
+                          1252     ; Inputs: None.
+                          1253     ; Outputs: None.
+                          1254     ; User Interface: None.
+                          1255     ; Error Handling: None.
+                          1256     ; Algorithms: None.
+                          1257     ;
+                          1258     ; Data Structures: None.
+                          1259     ; Limitations: None.
+                          1260     ; Known Bugs: None.
+                          1261     ; Registers used: AX, SI
+                          1262     ;
+                          1263     ; Author: Meera Krishnamoorthy
+                          1264     ; Last Modified: 10/17/16
+                          1265     ;
+                          1266     
+012B                      1267     DisplayMotorInfo      PROC        NEAR
+                          1268             PUBLIC      DisplayMotorInfo
+                          1269     
+012B BB0000               1270     MOV BX, 0 ; will index dispmotorbuffer (tell us how many characters
+                          1271                       ; of the string buffer we have used)
+                          1272     
+012E                      1273     StoreCurrSpeed:
+012E E80000         E     1274         Call GetMotorSpeed ; gets current speed of robotrike
+                          1275                                                ; stores current speed in AX
+                          1276                                                
+                          1277             ; preparing to call Hex2String to convert motor speed from
+                          1278         ; hexadecimal value to its representation in ASCII
+0131 8D360000       R     1279         LEA SI, dispmotorbuffer ; sets address to put ASCII representation
+                          1280                                                         ; of speed to dispmotorbuffer
+0135 03F3                 1281         ADD SI, BX ; add offset (currently 0)
+0137 53                   1282             PUSH BX ; save index in string (BX)
+0138 E80000         E     1283         Call Hex2String ; convert speed to ASCII representation
+013B 5B                   1284             POP BX ; get back index in string
+013C 83C304               1285         ADD BX, SPEED_SIZE ; the ASCII representation of the robotrike speed
+                          1286                                                ; takes up SPEED_SIZE bytes. thus we add
+                          1287                                                ; SPEED_SIZE to our index in dispmotorbuff
+                                   er because
+                          1288                                                ; we have used SPEED_SIZE characters
+                          1289      
+013F                      1290     StoreCurrDir: 
+013F C68700002090   R     1291             MOV dispmotorbuffer[BX], ASCII_SPACE ; add space in string buffer
+                          1292                                                                                      ; to
+                                    separate speed from angle
+                          1293                                                                                      ; (w
+                                   ill be displaying speed
+                          1294                                                                                      ; an
+                                   d angle)
+0145 43                   1295             INC BX ; increment index because added a character 
+0146 E80000         E     1296         Call GetMotorDirection ; get current direction of RoboTrike
+                          1297             
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   19
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1298             ; preparing to call Hex2String to convert motor direction from
+                          1299         ; hexadecimal value to its representation in ASCII
+                          1300             
+0149 8D360000       R     1301         LEA SI, dispmotorbuffer ; sets address to put ASCII representation
+                          1302                                                         ; of angle to dispmotorbuffer
+014D 03F3                 1303         ADD SI, BX ; add offset (the number of characters we have used
+                          1304                                ; in dispmotorbuffer)
+014F 53                   1305             PUSH BX ; save index in string (BX)
+0150 E80000         E     1306         Call Hex2String ; convert angle to ASCII representation
+0153 5B                   1307         POP BX ; get back index in string
+0154 83C303               1308         ADD BX, ANGLE_SIZE ; the ASCII representation of the robotrike angle
+                          1309                                                ; takes up ANGLE_SIZE bytes. thus we add
+                          1310                                                ; ANGLE_SIZE to our index in dispmotorbuff
+                                   er because
+                          1311                                                ; we have used ANGLE_SIZE characters
+                          1312         
+0157                      1313     EndDispMotorInfo:
+0157 C68700000090   R     1314             MOV dispmotorbuffer[BX], ASCII_NULL ; add null character to end of
+                          1315                                                                                     ; str
+                                   ing buffer to indicate
+                          1316                                                                                     ; it 
+                                   is a string
+015D C3                   1317         RET
+                          1318     
+                          1319     
+                          1320     DisplayMotorInfo        ENDP
+                          1321     
+                          1322     ; CheckCriticalFlag
+                          1323     ; Description: This function checks the critical flag (which is set if
+                          1324     ; the Event Queue is full. It moves the value of the critical flag
+                          1325     ; to a register so the main loop can find out if the queue is full,
+                          1326     ;
+                          1327     ; Operational Description: This is done by moving the value of the critical
+                          1328     ; flag into AX. The main loop will then check the value of AX, and if 
+                          1329     ; it is set to be a special value (CRITICAL_FLAG), then the queue
+                          1330     ; is empty.
+                          1331     ;
+                          1332     ; Arguments: None.
+                          1333     ; Return Values: None.
+                          1334     ; Global Variables: None.
+                          1335     ; Shared Variables: criticalflag: set if the event queue is full (used to 
+                          1336     ;                             check if the main loop has to restart. size: word,
+                          1337     ;                             type: R/W
+                          1338     ; Local Variables: None.
+                          1339     ;
+                          1340     ; Inputs: None.
+                          1341     ; Outputs: None.
+                          1342     ; User Interface: None.
+                          1343     ; Error Handling: None.
+                          1344     ; Algorithms: None.
+                          1345     ;
+                          1346     ; Data Structures: None.
+                          1347     ; Limitations: None.
+                          1348     ; Known Bugs: None.
+                          1349     ; Registers used: AX
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   20
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1350     ;
+                          1351     ; Author: Meera Krishnamoorthy
+                          1352     ; Last Modified: 12/5/16
+                          1353     ;
+                          1354     
+015E                      1355     CheckCriticalFlag      PROC        NEAR
+                          1356             PUBLIC      CheckCriticalFlag
+                          1357             
+015E                      1358     ConfirmQueueStatus:
+015E A11302         R     1359         MOV AX, criticalflag ; the main loop checks AX for the value
+                          1360                              ; of AX. AX is set to CRITICAL_VALUE 
+0161                      1361     EndCriticalFlag: 
+0161 C3                   1362         RET
+                          1363     
+                          1364     CheckCriticalFlag       ENDP
+                          1365     
+                          1366     
+                          1367     ; MotorTable
+                          1368     ;
+                          1369     ; Description:     This table indexes functions to call to handle various
+                          1370     ;                  events based on the constants related to those
+                          1371     ;                  events (stored in the high bit of AH when enqueued
+                          1372     ;                  to the event queue). A constant of 0 would indicate
+                          1373     ;                  a key event, for example, which would lead to calling
+                          1374     ;                  get key press, and so on. 
+                          1375     ;
+                          1376     ;
+                          1377     ; Notes:            READ ONLY tables should always be in the code segment so
+                          1378     ;                   that in a standalone system it will be located in the
+                          1379     ;                   ROM with the code.
+                          1380     ;
+                          1381     ; Author:           Meera Krishnamoorthy
+                          1382     ; Last Modified:    11/12/16
+                          1383     
+                          1384     
+                          1385     
+                          1386     ;the data segment. initialized because used later on. 
+0162                      1387     MotorTable       LABEL   WORD
+                          1388             PUBLIC  MotorTable
+                          1389     
+0162 0000           E     1390     DW          offset(doNOP) ; corresponds to key press event
+0164 6E00           R     1391     DW          offset(GetError) ; corresponds to serial error event
+0166 BE00           R     1392     DW          offset(GetReceivedData) ; corresponds to received data event
+0168 0000           E     1393     DW          offset(doNOP) ; corresponds to queue being empty
+                          1394     
+                          1395     
+                          1396     ; MotorErrors
+                          1397     ;
+                          1398     ; Description:      This table is called when there are motor errors and
+                          1399     ;                   will display those strings. This table only has one
+                          1400     ;                   entry for now, but could have more if we wanted
+                          1401     ;                   to specify type of parsing error. 
+                          1402     ;
+                          1403     ; Notes:            READ ONLY tables should always be in the code segment so
+                          1404     ;                   that in a standalone system it will be located in the
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   21
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1405     ;                   ROM with the code.
+                          1406     ;
+                          1407     ; Author:           Meera Krishnamoorthy
+                          1408     ; Last Modified:    11/12/16
+                          1409     
+016A                      1410     MotorErrors       LABEL   BYTE
+                          1411             PUBLIC  MotorErrors        
+016A 70617273657220       1412     DB 'parser ',ASCII_NULL          ; is displayed when there is a parsing error
+0171 00
+                          1413                                  ; on the motor side
+                          1414     
+                          1415     ; ErrorTable
+                          1416     ;
+                          1417     ; Description:      This table has a list of errors corresponding to the
+                          1418     ;                   value of the line status register
+                          1419     ; Notes:            READ ONLY tables should always be in the code segment so
+                          1420     ;                   that in a standalone system it will be located in the
+                          1421     ;                   ROM with the code.
+                          1422     ;
+                          1423     ; Author:           Meera Krishnamoorthy
+                          1424     ; Last Modified:    12/5/16
+                          1425     
+0172                      1426     ErrorTable       LABEL   BYTE
+                          1427             PUBLIC  ErrorTable 
+0172 4572726F722020       1428     DB 'Error  ',ASCII_NULL    ; lsr is other value 
+0179 00
+017A 4F76657272756E       1429     DB 'Overrun',ASCII_NULL    ; lsr: 2// second bit of lsr is set   
+0181 00
+0182 50617269747920       1430     DB 'Parity ',ASCII_NULL    ; lrs: 4// third bit of lsr is set        
+0189 00
+018A 6F2D7020202020       1431     DB 'o-p    ',ASCII_NULL    ; lsr: 6// 2/3 bit of lsr is set    
+0191 00
+0192 4672616D696E67       1432     DB 'Framing',ASCII_NULL    ; lsr: 8// fourth bit of lsr  is set            
+0199 00
+019A 462D6F20202020       1433     DB 'F-o    ',ASCII_NULL    ; lsr: 10// 4/2 bit of lsr is set 
+01A1 00
+01A2 462D5020202020       1434     DB 'F-P    ',ASCII_NULL    ; lsr: 12// 4/3 bit of lsr is set 
+01A9 00
+01AA 462D502D6F2020       1435     DB 'F-P-o  ',ASCII_NULL    ; lsr: 14// 4/3/2 bit of lsr is set 
+01B1 00
+01B2 627265616B2020       1436     DB 'break  ',ASCII_NULL    ; lsr: 16// fifth bit of lsr is set  
+01B9 00
+01BA 622D6F20202020       1437     DB 'b-o    ',ASCII_NULL    ; lsr: 18// 5/2 bit of lsr is set 
+01C1 00
+01C2 622D5020202020       1438     DB 'b-P    ',ASCII_NULL    ; lsr: 20// 5/3 bit of lsr is set 
+01C9 00
+01CA 622D6620202020       1439     DB 'b-f    ',ASCII_NULL    ; lsr: 22// 5/3/2 bit of lsr is set 
+01D1 00
+01D2 622D662D6F2020       1440     DB 'b-f-o  ',ASCII_NULL    ; lsr: 24// 5/4 bit of lsr is set 
+01D9 00
+                          1441        
+----                      1442     CODE    ENDS
+                          1443     
+                          1444     ;the data segment
+                          1445     
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    17:58:44  12/09/;6  PAGE   22
+
+
+LOC  OBJ                  LINE     SOURCE
+
+----                      1446     DATA    SEGMENT PUBLIC  'DATA'
+                          1447     
+0000 (8                   1448     dispmotorbuffer   DB DISPLAY_LEN DUP (?)
+     ??
+     )
+0008 ????                 1449     motorindex     DW      ?  ; indexes string sent in SerialPutString
+000A ????                 1450     EventQueue QueueStruct <>  ; creates an instance of the queue structure   
+000C ????
+000E ????
+0010 ????
+0012 (513
+     ??
+     )
+                          1451                                ; to be used to hold events that occur
+                          1452                                                             
+0213 ????                 1453     criticalflag    DW      ?  ; set if event queue is full 
+0215 ??                   1454     errorflag       DB      ?  ; set if serial error occurred
+                          1455     
+0216 ????                 1456     segmentchange   DW      ? ; set to change segment from which to get string
+                          1457                                                       ; to send to remote side from CS to
+                                    DS
+                          1458     
+----                      1459     DATA    ENDS
+                          1460     
+                          1461     
+                          1462     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

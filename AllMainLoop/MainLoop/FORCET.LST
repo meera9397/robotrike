@@ -1,0 +1,79 @@
+8086/87/88/186 MACRO ASSEMBLER    FORCETABLE                                               17:04:57  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE FORCETABLE
+OBJECT MODULE PLACED IN FORCET.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE FORCET.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME  FORCETABLE
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                  FORCETABLE                               ;
+                             6     ;                                                                            ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; This file contains the horizontal/ vertical forces associated with each motor.
+                            10     ; Revision History:
+                            11     ; Meera Krishnamoorthy  11/12/16  create table
+                            12     
+                            13     
+                            14     ;setup code group and start the code segment
+                            15     CGROUP  GROUP   CODE
+                            16     
+----                        17     CODE    SEGMENT PUBLIC 'CODE'
+                            18     
+                            19     
+                            20     ; MotorForcesX_Table
+                            21     ;
+                            22     ; Description:      These are the components of horizontal
+                            23     ;                   force given to each motor.
+                            24     ;
+                            25     ;
+                            26     ; Notes:            READ ONLY tables should always be in the code segment so
+                            27     ;                   that in a standalone system it will be located in the
+                            28     ;                   ROM with the code.
+                            29     ;
+                            30     ; Author:           Meera Krishnamoorthy
+                            31     ; Last Modified:    11/12/16
+                            32     
+0000                        33     MotorForcesX_Table       LABEL   WORD
+                            34             PUBLIC  MotorForcesX_Table
+                            35     
+0000 FF7F                   36     DW          7FFFH        ; F_1_x
+0002 00C0                   37     DW          0C000H       ; F_2_x
+0004 00C0                   38     DW          0C000H       ; F_3_x
+                            39     
+                            40     ; MotorForcesY_Table
+                            41     ;
+                            42     ; Description:      These are the components of vertical
+                            43     ;                   force given to each motor.
+                            44     ;
+                            45     ; Notes:            READ ONLY tables should always be in the code segment so
+                            46     ;                   that in a standalone system it will be located in the
+                            47     ;                   ROM with the code.
+                            48     ;
+                            49     ; Author:           Meera Krishnamoorthy
+                            50     ; Last Modified:    11/12/16
+8086/87/88/186 MACRO ASSEMBLER    FORCETABLE                                               17:04:57  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0006                        51     MotorForcesY_Table       LABEL   WORD
+                            52             PUBLIC  MotorForcesY_Table
+                            53     
+0006 0000                   54     DW          0000H        ; F_1_y
+0008 2791                   55     DW          9127H        ; F_2_y
+000A D96E                   56     DW          6ED9H        ; F_3_y
+                            57     
+----                        58     CODE    ENDS
+                            59     
+                            60     
+                            61     
+                            62     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

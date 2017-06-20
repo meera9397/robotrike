@@ -1,0 +1,887 @@
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE TRIG_TABLE
+OBJECT MODULE PLACED IN TRIGTBL.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE TRIGTBL.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME  TRIG_TABLE
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   TRIG_TABLE                               ;
+                             6     ;                           Tables of normalized SIN/COS values              ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; This file contains the tables of sin and cosin values normalized to 32767. 
+                            11     ; Integer values are provided for 1 degree increments from 0-360 degrees, and
+                            12     ; normal rounding is used. 
+                            13     ; The tables include are:
+                            14     ;       Sin_Table - table of sine values for 0-360 degrees. 
+                            15     ;       Cos_Table - table of consine values for 0-360 degrees.
+                            16     ;
+                            17     ; Revision History:
+                            18     ;    02/20/2006   Xiaoliang (Lee) Zhu           initial revision
+                            19     
+                            20     
+                            21     
+                            22     ; local include files
+                            23     ;    none
+                            24     
+                            25     
+                            26     ;setup code group and start the code segment
+                            27     CGROUP  GROUP   CODE
+                            28     
+----                        29     CODE    SEGMENT PUBLIC 'CODE'
+                            30     
+                            31     
+                            32     ; Sin_Table 
+                            33     ;
+                            34     ; Description:      This is the sin value table for 0-360 degrees. 
+                            35     ;                   Normal rounding is used to generate the values. 
+                            36     ;
+                            37     ; Notes:            READ ONLY tables should always be in the code segment so
+                            38     ;                   that in a standalone system it will be located in the
+                            39     ;                   ROM with the code.
+                            40     ;
+                            41     ; Author:           Xiaoliang (Lee) Zhu
+                            42     ; Last Modified:    Feb. 20. 2006
+                            43     
+0000                        44     Sin_Table       LABEL   WORD
+                            45                     PUBLIC  Sin_Table
+                            46     
+                            47     
+                            48     ;       DW      normalized value (decimal)
+                            49                             
+0000 0000                   50             DW             0        ; 0 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0002 3C02                   51             DW           572        ; 1 degrees
+0004 7804                   52             DW          1144        ; 2 degrees
+0006 B306                   53             DW          1715        ; 3 degrees
+0008 EE08                   54             DW          2286        ; 4 degrees
+000A 280B                   55             DW          2856        ; 5 degrees
+000C 610D                   56             DW          3425        ; 6 degrees
+000E 990F                   57             DW          3993        ; 7 degrees
+0010 D011                   58             DW          4560        ; 8 degrees
+0012 0614                   59             DW          5126        ; 9 degrees
+0014 3A16                   60             DW          5690        ; 10 degrees
+0016 6C18                   61             DW          6252        ; 11 degrees
+0018 9D1A                   62             DW          6813        ; 12 degrees
+001A CB1C                   63             DW          7371        ; 13 degrees
+001C F71E                   64             DW          7927        ; 14 degrees
+001E 2121                   65             DW          8481        ; 15 degrees
+0020 4823                   66             DW          9032        ; 16 degrees
+0022 6C25                   67             DW          9580        ; 17 degrees
+0024 8E27                   68             DW         10126        ; 18 degrees
+0026 AC29                   69             DW         10668        ; 19 degrees
+0028 C72B                   70             DW         11207        ; 20 degrees
+002A DF2D                   71             DW         11743        ; 21 degrees
+002C F32F                   72             DW         12275        ; 22 degrees
+002E 0332                   73             DW         12803        ; 23 degrees
+0030 1034                   74             DW         13328        ; 24 degrees
+0032 1836                   75             DW         13848        ; 25 degrees
+0034 1C38                   76             DW         14364        ; 26 degrees
+0036 1C3A                   77             DW         14876        ; 27 degrees
+0038 173C                   78             DW         15383        ; 28 degrees
+003A 0E3E                   79             DW         15886        ; 29 degrees
+003C 0040                   80             DW         16384        ; 30 degrees
+003E EC41                   81             DW         16876        ; 31 degrees
+0040 D443                   82             DW         17364        ; 32 degrees
+0042 B645                   83             DW         17846        ; 33 degrees
+0044 9347                   84             DW         18323        ; 34 degrees
+0046 6A49                   85             DW         18794        ; 35 degrees
+0048 3C4B                   86             DW         19260        ; 36 degrees
+004A 084D                   87             DW         19720        ; 37 degrees
+004C CD4E                   88             DW         20173        ; 38 degrees
+004E 8D50                   89             DW         20621        ; 39 degrees
+0050 4652                   90             DW         21062        ; 40 degrees
+0052 F953                   91             DW         21497        ; 41 degrees
+0054 A555                   92             DW         21925        ; 42 degrees
+0056 4B57                   93             DW         22347        ; 43 degrees
+0058 EA58                   94             DW         22762        ; 44 degrees
+005A 825A                   95             DW         23170        ; 45 degrees
+005C 135C                   96             DW         23571        ; 46 degrees
+005E 9C5D                   97             DW         23964        ; 47 degrees
+0060 1F5F                   98             DW         24351        ; 48 degrees
+0062 9A60                   99             DW         24730        ; 49 degrees
+0064 0D62                  100             DW         25101        ; 50 degrees
+0066 7963                  101             DW         25465        ; 51 degrees
+0068 DD64                  102             DW         25821        ; 52 degrees
+006A 3966                  103             DW         26169        ; 53 degrees
+006C 8D67                  104             DW         26509        ; 54 degrees
+006E D968                  105             DW         26841        ; 55 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0070 1D6A                  106             DW         27165        ; 56 degrees
+0072 596B                  107             DW         27481        ; 57 degrees
+0074 8C6C                  108             DW         27788        ; 58 degrees
+0076 B76D                  109             DW         28087        ; 59 degrees
+0078 D96E                  110             DW         28377        ; 60 degrees
+007A F36F                  111             DW         28659        ; 61 degrees
+007C 0471                  112             DW         28932        ; 62 degrees
+007E 0C72                  113             DW         29196        ; 63 degrees
+0080 0B73                  114             DW         29451        ; 64 degrees
+0082 0174                  115             DW         29697        ; 65 degrees
+0084 EE74                  116             DW         29934        ; 66 degrees
+0086 D275                  117             DW         30162        ; 67 degrees
+0088 AD76                  118             DW         30381        ; 68 degrees
+008A 7F77                  119             DW         30591        ; 69 degrees
+008C 4778                  120             DW         30791        ; 70 degrees
+008E 0679                  121             DW         30982        ; 71 degrees
+0090 BB79                  122             DW         31163        ; 72 degrees
+0092 677A                  123             DW         31335        ; 73 degrees
+0094 0A7B                  124             DW         31498        ; 74 degrees
+0096 A27B                  125             DW         31650        ; 75 degrees
+0098 327C                  126             DW         31794        ; 76 degrees
+009A B77C                  127             DW         31927        ; 77 degrees
+009C 337D                  128             DW         32051        ; 78 degrees
+009E A57D                  129             DW         32165        ; 79 degrees
+00A0 0D7E                  130             DW         32269        ; 80 degrees
+00A2 6C7E                  131             DW         32364        ; 81 degrees
+00A4 C07E                  132             DW         32448        ; 82 degrees
+00A6 0B7F                  133             DW         32523        ; 83 degrees
+00A8 4B7F                  134             DW         32587        ; 84 degrees
+00AA 827F                  135             DW         32642        ; 85 degrees
+00AC AF7F                  136             DW         32687        ; 86 degrees
+00AE D27F                  137             DW         32722        ; 87 degrees
+00B0 EB7F                  138             DW         32747        ; 88 degrees
+00B2 FA7F                  139             DW         32762        ; 89 degrees
+00B4 FF7F                  140             DW         32767        ; 90 degrees
+                           141     
+00B6 FA7F                  142             DW         32762        ; 91 degrees
+00B8 EB7F                  143             DW         32747        ; 92 degrees
+00BA D27F                  144             DW         32722        ; 93 degrees
+00BC AF7F                  145             DW         32687        ; 94 degrees
+00BE 827F                  146             DW         32642        ; 95 degrees
+00C0 4B7F                  147             DW         32587        ; 96 degrees
+00C2 0B7F                  148             DW         32523        ; 97 degrees
+00C4 C07E                  149             DW         32448        ; 98 degrees
+00C6 6C7E                  150             DW         32364        ; 99 degrees
+00C8 0D7E                  151             DW         32269        ; 100 degrees
+00CA A57D                  152             DW         32165        ; 101 degrees
+00CC 337D                  153             DW         32051        ; 102 degrees
+00CE B77C                  154             DW         31927        ; 103 degrees
+00D0 327C                  155             DW         31794        ; 104 degrees
+00D2 A27B                  156             DW         31650        ; 105 degrees
+00D4 0A7B                  157             DW         31498        ; 106 degrees
+00D6 677A                  158             DW         31335        ; 107 degrees
+00D8 BB79                  159             DW         31163        ; 108 degrees
+00DA 0679                  160             DW         30982        ; 109 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00DC 4778                  161             DW         30791        ; 110 degrees
+00DE 7F77                  162             DW         30591        ; 111 degrees
+00E0 AD76                  163             DW         30381        ; 112 degrees
+00E2 D275                  164             DW         30162        ; 113 degrees
+00E4 EE74                  165             DW         29934        ; 114 degrees
+00E6 0174                  166             DW         29697        ; 115 degrees
+00E8 0B73                  167             DW         29451        ; 116 degrees
+00EA 0C72                  168             DW         29196        ; 117 degrees
+00EC 0471                  169             DW         28932        ; 118 degrees
+00EE F36F                  170             DW         28659        ; 119 degrees
+00F0 D96E                  171             DW         28377        ; 120 degrees
+00F2 B76D                  172             DW         28087        ; 121 degrees
+00F4 8C6C                  173             DW         27788        ; 122 degrees
+00F6 596B                  174             DW         27481        ; 123 degrees
+00F8 1D6A                  175             DW         27165        ; 124 degrees
+00FA D968                  176             DW         26841        ; 125 degrees
+00FC 8D67                  177             DW         26509        ; 126 degrees
+00FE 3966                  178             DW         26169        ; 127 degrees
+0100 DD64                  179             DW         25821        ; 128 degrees
+0102 7963                  180             DW         25465        ; 129 degrees
+0104 0D62                  181             DW         25101        ; 130 degrees
+0106 9A60                  182             DW         24730        ; 131 degrees
+0108 1F5F                  183             DW         24351        ; 132 degrees
+010A 9C5D                  184             DW         23964        ; 133 degrees
+010C 135C                  185             DW         23571        ; 134 degrees
+010E 825A                  186             DW         23170        ; 135 degrees
+0110 EA58                  187             DW         22762        ; 136 degrees
+0112 4B57                  188             DW         22347        ; 137 degrees
+0114 A555                  189             DW         21925        ; 138 degrees
+0116 F953                  190             DW         21497        ; 139 degrees
+0118 4652                  191             DW         21062        ; 140 degrees
+011A 8D50                  192             DW         20621        ; 141 degrees
+011C CD4E                  193             DW         20173        ; 142 degrees
+011E 084D                  194             DW         19720        ; 143 degrees
+0120 3C4B                  195             DW         19260        ; 144 degrees
+0122 6A49                  196             DW         18794        ; 145 degrees
+0124 9347                  197             DW         18323        ; 146 degrees
+0126 B645                  198             DW         17846        ; 147 degrees
+0128 D443                  199             DW         17364        ; 148 degrees
+012A EC41                  200             DW         16876        ; 149 degrees
+012C 0040                  201             DW         16384        ; 150 degrees
+012E 0E3E                  202             DW         15886        ; 151 degrees
+0130 173C                  203             DW         15383        ; 152 degrees
+0132 1C3A                  204             DW         14876        ; 153 degrees
+0134 1C38                  205             DW         14364        ; 154 degrees
+0136 1836                  206             DW         13848        ; 155 degrees
+0138 1034                  207             DW         13328        ; 156 degrees
+013A 0332                  208             DW         12803        ; 157 degrees
+013C F32F                  209             DW         12275        ; 158 degrees
+013E DF2D                  210             DW         11743        ; 159 degrees
+0140 C72B                  211             DW         11207        ; 160 degrees
+0142 AC29                  212             DW         10668        ; 161 degrees
+0144 8E27                  213             DW         10126        ; 162 degrees
+0146 6C25                  214             DW          9580        ; 163 degrees
+0148 4823                  215             DW          9032        ; 164 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+014A 2121                  216             DW          8481        ; 165 degrees
+014C F71E                  217             DW          7927        ; 166 degrees
+014E CB1C                  218             DW          7371        ; 167 degrees
+0150 9D1A                  219             DW          6813        ; 168 degrees
+0152 6C18                  220             DW          6252        ; 169 degrees
+0154 3A16                  221             DW          5690        ; 170 degrees
+0156 0614                  222             DW          5126        ; 171 degrees
+0158 D011                  223             DW          4560        ; 172 degrees
+015A 990F                  224             DW          3993        ; 173 degrees
+015C 610D                  225             DW          3425        ; 174 degrees
+015E 280B                  226             DW          2856        ; 175 degrees
+0160 EE08                  227             DW          2286        ; 176 degrees
+0162 B306                  228             DW          1715        ; 177 degrees
+0164 7804                  229             DW          1144        ; 178 degrees
+0166 3C02                  230             DW           572        ; 179 degrees
+0168 0000                  231             DW             0        ; 180 degrees
+                           232     
+016A C4FD                  233             DW          -572        ; 181 degrees
+016C 88FB                  234             DW         -1144        ; 182 degrees
+016E 4DF9                  235             DW         -1715        ; 183 degrees
+0170 12F7                  236             DW         -2286        ; 184 degrees
+0172 D8F4                  237             DW         -2856        ; 185 degrees
+0174 9FF2                  238             DW         -3425        ; 186 degrees
+0176 67F0                  239             DW         -3993        ; 187 degrees
+0178 30EE                  240             DW         -4560        ; 188 degrees
+017A FAEB                  241             DW         -5126        ; 189 degrees
+017C C6E9                  242             DW         -5690        ; 190 degrees
+017E 94E7                  243             DW         -6252        ; 191 degrees
+0180 63E5                  244             DW         -6813        ; 192 degrees
+0182 35E3                  245             DW         -7371        ; 193 degrees
+0184 09E1                  246             DW         -7927        ; 194 degrees
+0186 DFDE                  247             DW         -8481        ; 195 degrees
+0188 B8DC                  248             DW         -9032        ; 196 degrees
+018A 94DA                  249             DW         -9580        ; 197 degrees
+018C 72D8                  250             DW        -10126        ; 198 degrees
+018E 54D6                  251             DW        -10668        ; 199 degrees
+0190 39D4                  252             DW        -11207        ; 200 degrees
+0192 21D2                  253             DW        -11743        ; 201 degrees
+0194 0DD0                  254             DW        -12275        ; 202 degrees
+0196 FDCD                  255             DW        -12803        ; 203 degrees
+0198 F0CB                  256             DW        -13328        ; 204 degrees
+019A E8C9                  257             DW        -13848        ; 205 degrees
+019C E4C7                  258             DW        -14364        ; 206 degrees
+019E E4C5                  259             DW        -14876        ; 207 degrees
+01A0 E9C3                  260             DW        -15383        ; 208 degrees
+01A2 F2C1                  261             DW        -15886        ; 209 degrees
+01A4 00C0                  262             DW        -16384        ; 210 degrees
+01A6 14BE                  263             DW        -16876        ; 211 degrees
+01A8 2CBC                  264             DW        -17364        ; 212 degrees
+01AA 4ABA                  265             DW        -17846        ; 213 degrees
+01AC 6DB8                  266             DW        -18323        ; 214 degrees
+01AE 96B6                  267             DW        -18794        ; 215 degrees
+01B0 C4B4                  268             DW        -19260        ; 216 degrees
+01B2 F8B2                  269             DW        -19720        ; 217 degrees
+01B4 33B1                  270             DW        -20173        ; 218 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+01B6 73AF                  271             DW        -20621        ; 219 degrees
+01B8 BAAD                  272             DW        -21062        ; 220 degrees
+01BA 07AC                  273             DW        -21497        ; 221 degrees
+01BC 5BAA                  274             DW        -21925        ; 222 degrees
+01BE B5A8                  275             DW        -22347        ; 223 degrees
+01C0 16A7                  276             DW        -22762        ; 224 degrees
+01C2 7EA5                  277             DW        -23170        ; 225 degrees
+01C4 EDA3                  278             DW        -23571        ; 226 degrees
+01C6 64A2                  279             DW        -23964        ; 227 degrees
+01C8 E1A0                  280             DW        -24351        ; 228 degrees
+01CA 669F                  281             DW        -24730        ; 229 degrees
+01CC F39D                  282             DW        -25101        ; 230 degrees
+01CE 879C                  283             DW        -25465        ; 231 degrees
+01D0 239B                  284             DW        -25821        ; 232 degrees
+01D2 C799                  285             DW        -26169        ; 233 degrees
+01D4 7398                  286             DW        -26509        ; 234 degrees
+01D6 2797                  287             DW        -26841        ; 235 degrees
+01D8 E395                  288             DW        -27165        ; 236 degrees
+01DA A794                  289             DW        -27481        ; 237 degrees
+01DC 7493                  290             DW        -27788        ; 238 degrees
+01DE 4992                  291             DW        -28087        ; 239 degrees
+01E0 2791                  292             DW        -28377        ; 240 degrees
+01E2 0D90                  293             DW        -28659        ; 241 degrees
+01E4 FC8E                  294             DW        -28932        ; 242 degrees
+01E6 F48D                  295             DW        -29196        ; 243 degrees
+01E8 F58C                  296             DW        -29451        ; 244 degrees
+01EA FF8B                  297             DW        -29697        ; 245 degrees
+01EC 128B                  298             DW        -29934        ; 246 degrees
+01EE 2E8A                  299             DW        -30162        ; 247 degrees
+01F0 5389                  300             DW        -30381        ; 248 degrees
+01F2 8188                  301             DW        -30591        ; 249 degrees
+01F4 B987                  302             DW        -30791        ; 250 degrees
+01F6 FA86                  303             DW        -30982        ; 251 degrees
+01F8 4586                  304             DW        -31163        ; 252 degrees
+01FA 9985                  305             DW        -31335        ; 253 degrees
+01FC F684                  306             DW        -31498        ; 254 degrees
+01FE 5E84                  307             DW        -31650        ; 255 degrees
+0200 CE83                  308             DW        -31794        ; 256 degrees
+0202 4983                  309             DW        -31927        ; 257 degrees
+0204 CD82                  310             DW        -32051        ; 258 degrees
+0206 5B82                  311             DW        -32165        ; 259 degrees
+0208 F381                  312             DW        -32269        ; 260 degrees
+020A 9481                  313             DW        -32364        ; 261 degrees
+020C 4081                  314             DW        -32448        ; 262 degrees
+020E F580                  315             DW        -32523        ; 263 degrees
+0210 B580                  316             DW        -32587        ; 264 degrees
+0212 7E80                  317             DW        -32642        ; 265 degrees
+0214 5180                  318             DW        -32687        ; 266 degrees
+0216 2E80                  319             DW        -32722        ; 267 degrees
+0218 1580                  320             DW        -32747        ; 268 degrees
+021A 0680                  321             DW        -32762        ; 269 degrees
+021C 0180                  322             DW        -32767        ; 270 degrees
+                           323     
+021E 0680                  324             DW        -32762        ; 271 degrees
+0220 1580                  325             DW        -32747        ; 272 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0222 2E80                  326             DW        -32722        ; 273 degrees
+0224 5180                  327             DW        -32687        ; 274 degrees
+0226 7E80                  328             DW        -32642        ; 275 degrees
+0228 B580                  329             DW        -32587        ; 276 degrees
+022A F580                  330             DW        -32523        ; 277 degrees
+022C 4081                  331             DW        -32448        ; 278 degrees
+022E 9481                  332             DW        -32364        ; 279 degrees
+0230 F381                  333             DW        -32269        ; 280 degrees
+0232 5B82                  334             DW        -32165        ; 281 degrees
+0234 CD82                  335             DW        -32051        ; 282 degrees
+0236 4983                  336             DW        -31927        ; 283 degrees
+0238 CE83                  337             DW        -31794        ; 284 degrees
+023A 5E84                  338             DW        -31650        ; 285 degrees
+023C F684                  339             DW        -31498        ; 286 degrees
+023E 9985                  340             DW        -31335        ; 287 degrees
+0240 4586                  341             DW        -31163        ; 288 degrees
+0242 FA86                  342             DW        -30982        ; 289 degrees
+0244 B987                  343             DW        -30791        ; 290 degrees
+0246 8188                  344             DW        -30591        ; 291 degrees
+0248 5389                  345             DW        -30381        ; 292 degrees
+024A 2E8A                  346             DW        -30162        ; 293 degrees
+024C 128B                  347             DW        -29934        ; 294 degrees
+024E FF8B                  348             DW        -29697        ; 295 degrees
+0250 F58C                  349             DW        -29451        ; 296 degrees
+0252 F48D                  350             DW        -29196        ; 297 degrees
+0254 FC8E                  351             DW        -28932        ; 298 degrees
+0256 0D90                  352             DW        -28659        ; 299 degrees
+0258 2791                  353             DW        -28377        ; 300 degrees
+025A 4992                  354             DW        -28087        ; 301 degrees
+025C 7493                  355             DW        -27788        ; 302 degrees
+025E A794                  356             DW        -27481        ; 303 degrees
+0260 E395                  357             DW        -27165        ; 304 degrees
+0262 2797                  358             DW        -26841        ; 305 degrees
+0264 7398                  359             DW        -26509        ; 306 degrees
+0266 C799                  360             DW        -26169        ; 307 degrees
+0268 239B                  361             DW        -25821        ; 308 degrees
+026A 879C                  362             DW        -25465        ; 309 degrees
+026C F39D                  363             DW        -25101        ; 310 degrees
+026E 669F                  364             DW        -24730        ; 311 degrees
+0270 E1A0                  365             DW        -24351        ; 312 degrees
+0272 64A2                  366             DW        -23964        ; 313 degrees
+0274 EDA3                  367             DW        -23571        ; 314 degrees
+0276 7EA5                  368             DW        -23170        ; 315 degrees
+0278 16A7                  369             DW        -22762        ; 316 degrees
+027A B5A8                  370             DW        -22347        ; 317 degrees
+027C 5BAA                  371             DW        -21925        ; 318 degrees
+027E 07AC                  372             DW        -21497        ; 319 degrees
+0280 BAAD                  373             DW        -21062        ; 320 degrees
+0282 73AF                  374             DW        -20621        ; 321 degrees
+0284 33B1                  375             DW        -20173        ; 322 degrees
+0286 F8B2                  376             DW        -19720        ; 323 degrees
+0288 C4B4                  377             DW        -19260        ; 324 degrees
+028A 96B6                  378             DW        -18794        ; 325 degrees
+028C 6DB8                  379             DW        -18323        ; 326 degrees
+028E 4ABA                  380             DW        -17846        ; 327 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0290 2CBC                  381             DW        -17364        ; 328 degrees
+0292 14BE                  382             DW        -16876        ; 329 degrees
+0294 00C0                  383             DW        -16384        ; 330 degrees
+0296 F2C1                  384             DW        -15886        ; 331 degrees
+0298 E9C3                  385             DW        -15383        ; 332 degrees
+029A E4C5                  386             DW        -14876        ; 333 degrees
+029C E4C7                  387             DW        -14364        ; 334 degrees
+029E E8C9                  388             DW        -13848        ; 335 degrees
+02A0 F0CB                  389             DW        -13328        ; 336 degrees
+02A2 FDCD                  390             DW        -12803        ; 337 degrees
+02A4 0DD0                  391             DW        -12275        ; 338 degrees
+02A6 21D2                  392             DW        -11743        ; 339 degrees
+02A8 39D4                  393             DW        -11207        ; 340 degrees
+02AA 54D6                  394             DW        -10668        ; 341 degrees
+02AC 72D8                  395             DW        -10126        ; 342 degrees
+02AE 94DA                  396             DW         -9580        ; 343 degrees
+02B0 B8DC                  397             DW         -9032        ; 344 degrees
+02B2 DFDE                  398             DW         -8481        ; 345 degrees
+02B4 09E1                  399             DW         -7927        ; 346 degrees
+02B6 35E3                  400             DW         -7371        ; 347 degrees
+02B8 63E5                  401             DW         -6813        ; 348 degrees
+02BA 94E7                  402             DW         -6252        ; 349 degrees
+02BC C6E9                  403             DW         -5690        ; 350 degrees
+02BE FAEB                  404             DW         -5126        ; 351 degrees
+02C0 30EE                  405             DW         -4560        ; 352 degrees
+02C2 67F0                  406             DW         -3993        ; 353 degrees
+02C4 9FF2                  407             DW         -3425        ; 354 degrees
+02C6 D8F4                  408             DW         -2856        ; 355 degrees
+02C8 12F7                  409             DW         -2286        ; 356 degrees
+02CA 4DF9                  410             DW         -1715        ; 357 degrees
+02CC 88FB                  411             DW         -1144        ; 358 degrees
+02CE C4FD                  412             DW          -572        ; 359 degrees
+02D0 0000                  413             DW             0        ; 360 degrees
+                           414     
+                           415     
+                           416     
+                           417     ; Cos_Table 
+                           418     ;
+                           419     ; Description:      This is the Cos value table for 0-360 degrees. 
+                           420     ;                   Normal rounding is used to generate the values. 
+                           421     ;
+                           422     ; Notes:            READ ONLY tables should always be in the code segment so
+                           423     ;                   that in a standalone system it will be located in the
+                           424     ;                   ROM with the code.
+                           425     ;
+                           426     ; Author:           Xiaoliang (Lee) Zhu
+                           427     ; Last Modified:    Feb. 20. 2006
+                           428     
+02D2                       429     Cos_Table       LABEL   WORD
+                           430                     PUBLIC  Cos_Table
+                           431     
+                           432     
+                           433     ;       DW      normalized value (decimal)      
+                           434             
+                           435     
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+02D2 FF7F                  436             DW         32767        ; 0 degrees
+02D4 FA7F                  437             DW         32762        ; 1 degrees
+02D6 EB7F                  438             DW         32747        ; 2 degrees
+02D8 D27F                  439             DW         32722        ; 3 degrees
+02DA AF7F                  440             DW         32687        ; 4 degrees
+02DC 827F                  441             DW         32642        ; 5 degrees
+02DE 4B7F                  442             DW         32587        ; 6 degrees
+02E0 0B7F                  443             DW         32523        ; 7 degrees
+02E2 C07E                  444             DW         32448        ; 8 degrees
+02E4 6C7E                  445             DW         32364        ; 9 degrees
+02E6 0D7E                  446             DW         32269        ; 10 degrees
+02E8 A57D                  447             DW         32165        ; 11 degrees
+02EA 337D                  448             DW         32051        ; 12 degrees
+02EC B77C                  449             DW         31927        ; 13 degrees
+02EE 327C                  450             DW         31794        ; 14 degrees
+02F0 A27B                  451             DW         31650        ; 15 degrees
+02F2 0A7B                  452             DW         31498        ; 16 degrees
+02F4 677A                  453             DW         31335        ; 17 degrees
+02F6 BB79                  454             DW         31163        ; 18 degrees
+02F8 0679                  455             DW         30982        ; 19 degrees
+02FA 4778                  456             DW         30791        ; 20 degrees
+02FC 7F77                  457             DW         30591        ; 21 degrees
+02FE AD76                  458             DW         30381        ; 22 degrees
+0300 D275                  459             DW         30162        ; 23 degrees
+0302 EE74                  460             DW         29934        ; 24 degrees
+0304 0174                  461             DW         29697        ; 25 degrees
+0306 0B73                  462             DW         29451        ; 26 degrees
+0308 0C72                  463             DW         29196        ; 27 degrees
+030A 0471                  464             DW         28932        ; 28 degrees
+030C F36F                  465             DW         28659        ; 29 degrees
+030E D96E                  466             DW         28377        ; 30 degrees
+0310 B76D                  467             DW         28087        ; 31 degrees
+0312 8C6C                  468             DW         27788        ; 32 degrees
+0314 596B                  469             DW         27481        ; 33 degrees
+0316 1D6A                  470             DW         27165        ; 34 degrees
+0318 D968                  471             DW         26841        ; 35 degrees
+031A 8D67                  472             DW         26509        ; 36 degrees
+031C 3966                  473             DW         26169        ; 37 degrees
+031E DD64                  474             DW         25821        ; 38 degrees
+0320 7963                  475             DW         25465        ; 39 degrees
+0322 0D62                  476             DW         25101        ; 40 degrees
+0324 9A60                  477             DW         24730        ; 41 degrees
+0326 1F5F                  478             DW         24351        ; 42 degrees
+0328 9C5D                  479             DW         23964        ; 43 degrees
+032A 135C                  480             DW         23571        ; 44 degrees
+032C 825A                  481             DW         23170        ; 45 degrees
+032E EA58                  482             DW         22762        ; 46 degrees
+0330 4B57                  483             DW         22347        ; 47 degrees
+0332 A555                  484             DW         21925        ; 48 degrees
+0334 F953                  485             DW         21497        ; 49 degrees
+0336 4652                  486             DW         21062        ; 50 degrees
+0338 8D50                  487             DW         20621        ; 51 degrees
+033A CD4E                  488             DW         20173        ; 52 degrees
+033C 084D                  489             DW         19720        ; 53 degrees
+033E 3C4B                  490             DW         19260        ; 54 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0340 6A49                  491             DW         18794        ; 55 degrees
+0342 9347                  492             DW         18323        ; 56 degrees
+0344 B645                  493             DW         17846        ; 57 degrees
+0346 D443                  494             DW         17364        ; 58 degrees
+0348 EC41                  495             DW         16876        ; 59 degrees
+034A 0040                  496             DW         16384        ; 60 degrees
+034C 0E3E                  497             DW         15886        ; 61 degrees
+034E 173C                  498             DW         15383        ; 62 degrees
+0350 1C3A                  499             DW         14876        ; 63 degrees
+0352 1C38                  500             DW         14364        ; 64 degrees
+0354 1836                  501             DW         13848        ; 65 degrees
+0356 1034                  502             DW         13328        ; 66 degrees
+0358 0332                  503             DW         12803        ; 67 degrees
+035A F32F                  504             DW         12275        ; 68 degrees
+035C DF2D                  505             DW         11743        ; 69 degrees
+035E C72B                  506             DW         11207        ; 70 degrees
+0360 AC29                  507             DW         10668        ; 71 degrees
+0362 8E27                  508             DW         10126        ; 72 degrees
+0364 6C25                  509             DW          9580        ; 73 degrees
+0366 4823                  510             DW          9032        ; 74 degrees
+0368 2121                  511             DW          8481        ; 75 degrees
+036A F71E                  512             DW          7927        ; 76 degrees
+036C CB1C                  513             DW          7371        ; 77 degrees
+036E 9D1A                  514             DW          6813        ; 78 degrees
+0370 6C18                  515             DW          6252        ; 79 degrees
+0372 3A16                  516             DW          5690        ; 80 degrees
+0374 0614                  517             DW          5126        ; 81 degrees
+0376 D011                  518             DW          4560        ; 82 degrees
+0378 990F                  519             DW          3993        ; 83 degrees
+037A 610D                  520             DW          3425        ; 84 degrees
+037C 280B                  521             DW          2856        ; 85 degrees
+037E EE08                  522             DW          2286        ; 86 degrees
+0380 B306                  523             DW          1715        ; 87 degrees
+0382 7804                  524             DW          1144        ; 88 degrees
+0384 3C02                  525             DW           572        ; 89 degrees
+0386 0000                  526             DW             0        ; 90 degrees
+                           527     
+0388 C4FD                  528             DW          -572        ; 91 degrees
+038A 88FB                  529             DW         -1144        ; 92 degrees
+038C 4DF9                  530             DW         -1715        ; 93 degrees
+038E 12F7                  531             DW         -2286        ; 94 degrees
+0390 D8F4                  532             DW         -2856        ; 95 degrees
+0392 9FF2                  533             DW         -3425        ; 96 degrees
+0394 67F0                  534             DW         -3993        ; 97 degrees
+0396 30EE                  535             DW         -4560        ; 98 degrees
+0398 FAEB                  536             DW         -5126        ; 99 degrees
+039A C6E9                  537             DW         -5690        ; 100 degrees
+039C 94E7                  538             DW         -6252        ; 101 degrees
+039E 63E5                  539             DW         -6813        ; 102 degrees
+03A0 35E3                  540             DW         -7371        ; 103 degrees
+03A2 09E1                  541             DW         -7927        ; 104 degrees
+03A4 DFDE                  542             DW         -8481        ; 105 degrees
+03A6 B8DC                  543             DW         -9032        ; 106 degrees
+03A8 94DA                  544             DW         -9580        ; 107 degrees
+03AA 72D8                  545             DW        -10126        ; 108 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+03AC 54D6                  546             DW        -10668        ; 109 degrees
+03AE 39D4                  547             DW        -11207        ; 110 degrees
+03B0 21D2                  548             DW        -11743        ; 111 degrees
+03B2 0DD0                  549             DW        -12275        ; 112 degrees
+03B4 FDCD                  550             DW        -12803        ; 113 degrees
+03B6 F0CB                  551             DW        -13328        ; 114 degrees
+03B8 E8C9                  552             DW        -13848        ; 115 degrees
+03BA E4C7                  553             DW        -14364        ; 116 degrees
+03BC E4C5                  554             DW        -14876        ; 117 degrees
+03BE E9C3                  555             DW        -15383        ; 118 degrees
+03C0 F2C1                  556             DW        -15886        ; 119 degrees
+03C2 00C0                  557             DW        -16384        ; 120 degrees
+03C4 14BE                  558             DW        -16876        ; 121 degrees
+03C6 2CBC                  559             DW        -17364        ; 122 degrees
+03C8 4ABA                  560             DW        -17846        ; 123 degrees
+03CA 6DB8                  561             DW        -18323        ; 124 degrees
+03CC 96B6                  562             DW        -18794        ; 125 degrees
+03CE C4B4                  563             DW        -19260        ; 126 degrees
+03D0 F8B2                  564             DW        -19720        ; 127 degrees
+03D2 33B1                  565             DW        -20173        ; 128 degrees
+03D4 73AF                  566             DW        -20621        ; 129 degrees
+03D6 BAAD                  567             DW        -21062        ; 130 degrees
+03D8 07AC                  568             DW        -21497        ; 131 degrees
+03DA 5BAA                  569             DW        -21925        ; 132 degrees
+03DC B5A8                  570             DW        -22347        ; 133 degrees
+03DE 16A7                  571             DW        -22762        ; 134 degrees
+03E0 7EA5                  572             DW        -23170        ; 135 degrees
+03E2 EDA3                  573             DW        -23571        ; 136 degrees
+03E4 64A2                  574             DW        -23964        ; 137 degrees
+03E6 E1A0                  575             DW        -24351        ; 138 degrees
+03E8 669F                  576             DW        -24730        ; 139 degrees
+03EA F39D                  577             DW        -25101        ; 140 degrees
+03EC 879C                  578             DW        -25465        ; 141 degrees
+03EE 239B                  579             DW        -25821        ; 142 degrees
+03F0 C799                  580             DW        -26169        ; 143 degrees
+03F2 7398                  581             DW        -26509        ; 144 degrees
+03F4 2797                  582             DW        -26841        ; 145 degrees
+03F6 E395                  583             DW        -27165        ; 146 degrees
+03F8 A794                  584             DW        -27481        ; 147 degrees
+03FA 7493                  585             DW        -27788        ; 148 degrees
+03FC 4992                  586             DW        -28087        ; 149 degrees
+03FE 2791                  587             DW        -28377        ; 150 degrees
+0400 0D90                  588             DW        -28659        ; 151 degrees
+0402 FC8E                  589             DW        -28932        ; 152 degrees
+0404 F48D                  590             DW        -29196        ; 153 degrees
+0406 F58C                  591             DW        -29451        ; 154 degrees
+0408 FF8B                  592             DW        -29697        ; 155 degrees
+040A 128B                  593             DW        -29934        ; 156 degrees
+040C 2E8A                  594             DW        -30162        ; 157 degrees
+040E 5389                  595             DW        -30381        ; 158 degrees
+0410 8188                  596             DW        -30591        ; 159 degrees
+0412 B987                  597             DW        -30791        ; 160 degrees
+0414 FA86                  598             DW        -30982        ; 161 degrees
+0416 4586                  599             DW        -31163        ; 162 degrees
+0418 9985                  600             DW        -31335        ; 163 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+041A F684                  601             DW        -31498        ; 164 degrees
+041C 5E84                  602             DW        -31650        ; 165 degrees
+041E CE83                  603             DW        -31794        ; 166 degrees
+0420 4983                  604             DW        -31927        ; 167 degrees
+0422 CD82                  605             DW        -32051        ; 168 degrees
+0424 5B82                  606             DW        -32165        ; 169 degrees
+0426 F381                  607             DW        -32269        ; 170 degrees
+0428 9481                  608             DW        -32364        ; 171 degrees
+042A 4081                  609             DW        -32448        ; 172 degrees
+042C F580                  610             DW        -32523        ; 173 degrees
+042E B580                  611             DW        -32587        ; 174 degrees
+0430 7E80                  612             DW        -32642        ; 175 degrees
+0432 5180                  613             DW        -32687        ; 176 degrees
+0434 2E80                  614             DW        -32722        ; 177 degrees
+0436 1580                  615             DW        -32747        ; 178 degrees
+0438 0680                  616             DW        -32762        ; 179 degrees
+043A 0180                  617             DW        -32767        ; 180 degrees
+                           618     
+043C 0680                  619             DW        -32762        ; 181 degrees
+043E 1580                  620             DW        -32747        ; 182 degrees
+0440 2E80                  621             DW        -32722        ; 183 degrees
+0442 5180                  622             DW        -32687        ; 184 degrees
+0444 7E80                  623             DW        -32642        ; 185 degrees
+0446 B580                  624             DW        -32587        ; 186 degrees
+0448 F580                  625             DW        -32523        ; 187 degrees
+044A 4081                  626             DW        -32448        ; 188 degrees
+044C 9481                  627             DW        -32364        ; 189 degrees
+044E F381                  628             DW        -32269        ; 190 degrees
+0450 5B82                  629             DW        -32165        ; 191 degrees
+0452 CD82                  630             DW        -32051        ; 192 degrees
+0454 4983                  631             DW        -31927        ; 193 degrees
+0456 CE83                  632             DW        -31794        ; 194 degrees
+0458 5E84                  633             DW        -31650        ; 195 degrees
+045A F684                  634             DW        -31498        ; 196 degrees
+045C 9985                  635             DW        -31335        ; 197 degrees
+045E 4586                  636             DW        -31163        ; 198 degrees
+0460 FA86                  637             DW        -30982        ; 199 degrees
+0462 B987                  638             DW        -30791        ; 200 degrees
+0464 8188                  639             DW        -30591        ; 201 degrees
+0466 5389                  640             DW        -30381        ; 202 degrees
+0468 2E8A                  641             DW        -30162        ; 203 degrees
+046A 128B                  642             DW        -29934        ; 204 degrees
+046C FF8B                  643             DW        -29697        ; 205 degrees
+046E F58C                  644             DW        -29451        ; 206 degrees
+0470 F48D                  645             DW        -29196        ; 207 degrees
+0472 FC8E                  646             DW        -28932        ; 208 degrees
+0474 0D90                  647             DW        -28659        ; 209 degrees
+0476 2791                  648             DW        -28377        ; 210 degrees
+0478 4992                  649             DW        -28087        ; 211 degrees
+047A 7493                  650             DW        -27788        ; 212 degrees
+047C A794                  651             DW        -27481        ; 213 degrees
+047E E395                  652             DW        -27165        ; 214 degrees
+0480 2797                  653             DW        -26841        ; 215 degrees
+0482 7398                  654             DW        -26509        ; 216 degrees
+0484 C799                  655             DW        -26169        ; 217 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0486 239B                  656             DW        -25821        ; 218 degrees
+0488 879C                  657             DW        -25465        ; 219 degrees
+048A F39D                  658             DW        -25101        ; 220 degrees
+048C 669F                  659             DW        -24730        ; 221 degrees
+048E E1A0                  660             DW        -24351        ; 222 degrees
+0490 64A2                  661             DW        -23964        ; 223 degrees
+0492 EDA3                  662             DW        -23571        ; 224 degrees
+0494 7EA5                  663             DW        -23170        ; 225 degrees
+0496 16A7                  664             DW        -22762        ; 226 degrees
+0498 B5A8                  665             DW        -22347        ; 227 degrees
+049A 5BAA                  666             DW        -21925        ; 228 degrees
+049C 07AC                  667             DW        -21497        ; 229 degrees
+049E BAAD                  668             DW        -21062        ; 230 degrees
+04A0 73AF                  669             DW        -20621        ; 231 degrees
+04A2 33B1                  670             DW        -20173        ; 232 degrees
+04A4 F8B2                  671             DW        -19720        ; 233 degrees
+04A6 C4B4                  672             DW        -19260        ; 234 degrees
+04A8 96B6                  673             DW        -18794        ; 235 degrees
+04AA 6DB8                  674             DW        -18323        ; 236 degrees
+04AC 4ABA                  675             DW        -17846        ; 237 degrees
+04AE 2CBC                  676             DW        -17364        ; 238 degrees
+04B0 14BE                  677             DW        -16876        ; 239 degrees
+04B2 00C0                  678             DW        -16384        ; 240 degrees
+04B4 F2C1                  679             DW        -15886        ; 241 degrees
+04B6 E9C3                  680             DW        -15383        ; 242 degrees
+04B8 E4C5                  681             DW        -14876        ; 243 degrees
+04BA E4C7                  682             DW        -14364        ; 244 degrees
+04BC E8C9                  683             DW        -13848        ; 245 degrees
+04BE F0CB                  684             DW        -13328        ; 246 degrees
+04C0 FDCD                  685             DW        -12803        ; 247 degrees
+04C2 0DD0                  686             DW        -12275        ; 248 degrees
+04C4 21D2                  687             DW        -11743        ; 249 degrees
+04C6 39D4                  688             DW        -11207        ; 250 degrees
+04C8 54D6                  689             DW        -10668        ; 251 degrees
+04CA 72D8                  690             DW        -10126        ; 252 degrees
+04CC 94DA                  691             DW         -9580        ; 253 degrees
+04CE B8DC                  692             DW         -9032        ; 254 degrees
+04D0 DFDE                  693             DW         -8481        ; 255 degrees
+04D2 09E1                  694             DW         -7927        ; 256 degrees
+04D4 35E3                  695             DW         -7371        ; 257 degrees
+04D6 63E5                  696             DW         -6813        ; 258 degrees
+04D8 94E7                  697             DW         -6252        ; 259 degrees
+04DA C6E9                  698             DW         -5690        ; 260 degrees
+04DC FAEB                  699             DW         -5126        ; 261 degrees
+04DE 30EE                  700             DW         -4560        ; 262 degrees
+04E0 67F0                  701             DW         -3993        ; 263 degrees
+04E2 9FF2                  702             DW         -3425        ; 264 degrees
+04E4 D8F4                  703             DW         -2856        ; 265 degrees
+04E6 12F7                  704             DW         -2286        ; 266 degrees
+04E8 4DF9                  705             DW         -1715        ; 267 degrees
+04EA 88FB                  706             DW         -1144        ; 268 degrees
+04EC C4FD                  707             DW          -572        ; 269 degrees
+04EE 0000                  708             DW             0        ; 270 degrees
+                           709     
+04F0 3C02                  710             DW           572        ; 271 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE   14
+
+
+LOC  OBJ                  LINE     SOURCE
+
+04F2 7804                  711             DW          1144        ; 272 degrees
+04F4 B306                  712             DW          1715        ; 273 degrees
+04F6 EE08                  713             DW          2286        ; 274 degrees
+04F8 280B                  714             DW          2856        ; 275 degrees
+04FA 610D                  715             DW          3425        ; 276 degrees
+04FC 990F                  716             DW          3993        ; 277 degrees
+04FE D011                  717             DW          4560        ; 278 degrees
+0500 0614                  718             DW          5126        ; 279 degrees
+0502 3A16                  719             DW          5690        ; 280 degrees
+0504 6C18                  720             DW          6252        ; 281 degrees
+0506 9D1A                  721             DW          6813        ; 282 degrees
+0508 CB1C                  722             DW          7371        ; 283 degrees
+050A F71E                  723             DW          7927        ; 284 degrees
+050C 2121                  724             DW          8481        ; 285 degrees
+050E 4823                  725             DW          9032        ; 286 degrees
+0510 6C25                  726             DW          9580        ; 287 degrees
+0512 8E27                  727             DW         10126        ; 288 degrees
+0514 AC29                  728             DW         10668        ; 289 degrees
+0516 C72B                  729             DW         11207        ; 290 degrees
+0518 DF2D                  730             DW         11743        ; 291 degrees
+051A F32F                  731             DW         12275        ; 292 degrees
+051C 0332                  732             DW         12803        ; 293 degrees
+051E 1034                  733             DW         13328        ; 294 degrees
+0520 1836                  734             DW         13848        ; 295 degrees
+0522 1C38                  735             DW         14364        ; 296 degrees
+0524 1C3A                  736             DW         14876        ; 297 degrees
+0526 173C                  737             DW         15383        ; 298 degrees
+0528 0E3E                  738             DW         15886        ; 299 degrees
+052A 0040                  739             DW         16384        ; 300 degrees
+052C EC41                  740             DW         16876        ; 301 degrees
+052E D443                  741             DW         17364        ; 302 degrees
+0530 B645                  742             DW         17846        ; 303 degrees
+0532 9347                  743             DW         18323        ; 304 degrees
+0534 6A49                  744             DW         18794        ; 305 degrees
+0536 3C4B                  745             DW         19260        ; 306 degrees
+0538 084D                  746             DW         19720        ; 307 degrees
+053A CD4E                  747             DW         20173        ; 308 degrees
+053C 8D50                  748             DW         20621        ; 309 degrees
+053E 4652                  749             DW         21062        ; 310 degrees
+0540 F953                  750             DW         21497        ; 311 degrees
+0542 A555                  751             DW         21925        ; 312 degrees
+0544 4B57                  752             DW         22347        ; 313 degrees
+0546 EA58                  753             DW         22762        ; 314 degrees
+0548 825A                  754             DW         23170        ; 315 degrees
+054A 135C                  755             DW         23571        ; 316 degrees
+054C 9C5D                  756             DW         23964        ; 317 degrees
+054E 1F5F                  757             DW         24351        ; 318 degrees
+0550 9A60                  758             DW         24730        ; 319 degrees
+0552 0D62                  759             DW         25101        ; 320 degrees
+0554 7963                  760             DW         25465        ; 321 degrees
+0556 DD64                  761             DW         25821        ; 322 degrees
+0558 3966                  762             DW         26169        ; 323 degrees
+055A 8D67                  763             DW         26509        ; 324 degrees
+055C D968                  764             DW         26841        ; 325 degrees
+055E 1D6A                  765             DW         27165        ; 326 degrees
+8086/87/88/186 MACRO ASSEMBLER    TRIG_TABLE                                               17:58:55  12/09/;6  PAGE   15
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0560 596B                  766             DW         27481        ; 327 degrees
+0562 8C6C                  767             DW         27788        ; 328 degrees
+0564 B76D                  768             DW         28087        ; 329 degrees
+0566 D96E                  769             DW         28377        ; 330 degrees
+0568 F36F                  770             DW         28659        ; 331 degrees
+056A 0471                  771             DW         28932        ; 332 degrees
+056C 0C72                  772             DW         29196        ; 333 degrees
+056E 0B73                  773             DW         29451        ; 334 degrees
+0570 0174                  774             DW         29697        ; 335 degrees
+0572 EE74                  775             DW         29934        ; 336 degrees
+0574 D275                  776             DW         30162        ; 337 degrees
+0576 AD76                  777             DW         30381        ; 338 degrees
+0578 7F77                  778             DW         30591        ; 339 degrees
+057A 4778                  779             DW         30791        ; 340 degrees
+057C 0679                  780             DW         30982        ; 341 degrees
+057E BB79                  781             DW         31163        ; 342 degrees
+0580 677A                  782             DW         31335        ; 343 degrees
+0582 0A7B                  783             DW         31498        ; 344 degrees
+0584 A27B                  784             DW         31650        ; 345 degrees
+0586 327C                  785             DW         31794        ; 346 degrees
+0588 B77C                  786             DW         31927        ; 347 degrees
+058A 337D                  787             DW         32051        ; 348 degrees
+058C A57D                  788             DW         32165        ; 349 degrees
+058E 0D7E                  789             DW         32269        ; 350 degrees
+0590 6C7E                  790             DW         32364        ; 351 degrees
+0592 C07E                  791             DW         32448        ; 352 degrees
+0594 0B7F                  792             DW         32523        ; 353 degrees
+0596 4B7F                  793             DW         32587        ; 354 degrees
+0598 827F                  794             DW         32642        ; 355 degrees
+059A AF7F                  795             DW         32687        ; 356 degrees
+059C D27F                  796             DW         32722        ; 357 degrees
+059E EB7F                  797             DW         32747        ; 358 degrees
+05A0 FA7F                  798             DW         32762        ; 359 degrees
+05A2 FF7F                  799             DW         32767        ; 360 degrees
+                           800     
+----                       801     CODE    ENDS
+                           802     
+                           803     
+                           804     
+                           805             END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

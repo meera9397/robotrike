@@ -1,0 +1,21 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: HW2TEST.OBJ, CONVERTS.OBJ
+OUTPUT FILE: HW2TEST.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  10/16/;6  TIME:  12:37:42
+
+
+LINK MAP OF MODULE HW2TEST
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 0263H ------    G    CODE            CODE                          
+ 0014H ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+HW2TEST.OBJ(HW2TEST)
+CONVERTS.OBJ(CONVERTS)

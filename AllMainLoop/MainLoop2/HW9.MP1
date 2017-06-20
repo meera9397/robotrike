@@ -1,0 +1,24 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: ALLEH.OBJ, MAIN10.OBJ, MFUNC2.OBJ, SERIAL.OBJ, HW94.LNK
+OUTPUT FILE: HW9.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  12/09/;6  TIME:  17:59:39
+
+
+LINK MAP OF MODULE EH
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 108FH ------    G    CODE            CODE                          
+ 0447H ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+ALLEH.OBJ(EH)
+MAIN10.OBJ(MAIN10)
+MFUNC2.OBJ(MFUNC)
+SERIAL.OBJ(SERIAL)
+HW94.LNK(CONVERTS)

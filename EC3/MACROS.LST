@@ -1,0 +1,282 @@
+8086/87/88/186 MACRO ASSEMBLER    MACROS                                                   20:39:31  11/23/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MACROS
+OBJECT MODULE PLACED IN MACROS.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MACROS.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    MACROS
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   MACROS                                   ;
+                             6     ;                                  EE/CS 51                                  ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     
+                            11     ; Overall Description: This file holds a function that tests the macros
+                            12     ;                                          written in macros.inc. 
+                            13     ; Revision History
+                            14     ;    11/20/16  Meera Krishnamoorthy wrote code
+                            15     
+                            16     
+                            17     CGROUP  GROUP   CODE
+                            18     DGROUP  GROUP   DATA
+                            19     
+                            20     
+----                        21     CODE    SEGMENT PUBLIC 'CODE'
+                            22     
+                            23     
+                            24     ASSUME  CS:CGROUP, DS: DGROUP
+                            25 +1  $INCLUDE(MACROS.INC)
+                      =1    26 +1  $NOLIST
+                           230     
+  0000                     231     VAL0 EQU 00000000B
+                           232     
+  008F                     233     VAL1 EQU 10001111B
+  00CF                     234     VAL2 EQU 11001111B
+                           235     
+                           236     ; TestMacros
+                           237     ;
+                           238     ; Description: This functions tests the macro functions in macros.inc
+                           239     ;
+                           240     ; Operation: This is done by calling each macro function in macros.inc with
+                           241     ;                        various constants, checking the registers after they 
+                           242     ;                        are used to see if they have changed them appropriately.  
+                           243     ;
+                           244     ; Arguments: None.
+                           245     ; Return Value: None.
+                           246     ;
+                           247     ; Local Variables: None.
+                           248     ; Shared Variables: None.
+                           249     ; Global Variables: None.
+                           250     ;
+                           251     ; Input: None.
+                           252     ; Output: None.
+                           253     ;
+8086/87/88/186 MACRO ASSEMBLER    MACROS                                                   20:39:31  11/23/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           254     ; Error Handling: None.
+                           255     ;
+                           256     ; Algorithms: None.
+                           257     ; Data Structures:
+                           258     ;
+                           259     ; Registers Changed: None.
+                           260     ; Stack Depth: None.
+                           261     ;
+                           262     ; Limitations: None.
+                           263     ;
+                           264     ; Author: Meera Krishnamoorthy
+                           265     ; Last Modified: 11/21/16
+                           266     ;
+                           267     
+0000                       268     TestMacros      PROC        NEAR
+                           269             PUBLIC      TestMacros
+                           270     
+0000 BB8F00                271     MOV BX, VAL1
+                           272     
+0003                       273     TestClear:
+                           274 +1          
+0003 BB0000                275 +2          MOV BX, 0 ; clears register
+                           276 +1   ; should clear BX (set to 0)
+                           277     
+0006                       278     TestSetBit:
+0006                       279     Test1SB:
+0006 BB0000                280             MOV BX, VAL0
+                           281 +1      
+0009 8BD3                  282 +2                  MOV DX, BX
+000B B80100                283 +1          MOV AX, 1 
+000E C1E003                284 +2          SHL AX,  3 ; only bit set in AX is "bit"
+0011 0BD0                  285 +1          OR DX, AX ; ensures that "bit" is set in AX because anythign or-ed
+                           286 +1                                    ; with 1 is 1
+0013 8BDA                  287 +2                  MOV BX, DX
+                           288 +1   ; should change BX from 0 to 00001000B
+0015                       289     Test2SB:
+0015 BB8F00                290             MOV BX, VAL1
+                           291 +1      
+0018 8BD3                  292 +2                  MOV DX, BX
+001A B80100                293 +1          MOV AX, 1 
+001D C1E006                294 +2          SHL AX,  6 ; only bit set in AX is "bit"
+0020 0BD0                  295 +1          OR DX, AX ; ensures that "bit" is set in AX because anythign or-ed
+                           296 +1                                    ; with 1 is 1
+0022 8BDA                  297 +2                  MOV BX, DX
+                           298 +1   ; should change BX from 10001111 to 11001111 (8f to cf)
+                           299     
+0024                       300     TestClearBit:
+0024                       301     Test1ClB:
+0024 BB0800                302             MOV BX, 8
+                           303 +1          
+0027 8BD3                  304 +2          MOV DX, BX
+0029 B80100                305 +1      MOV AX, 1 
+002C C1E003                306 +2      SHL AX,  3 ; only bit set in AX is #bit
+002F F7D0                  307 +1          NOT AX ; sets AX to its complement so all bits are set except AX
+0031 23D0                  308 +1      AND DX, AX ; anding something with 1 retains its value, and anding
+8086/87/88/186 MACRO ASSEMBLER    MACROS                                                   20:39:31  11/23/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           309 +1                             ; something with 0 sets its value to 0. this ensures all
+                           310 +1                             ; bits remain the same except #bit (because all other
+                           311 +1                             ; bits are anded with 1), and that #bit is anded with
+                           312 +1                             ; 0
+0033 8BDA                  313 +2          MOV BX, DX
+                           314 +1   ; should change BX from 8 to 00000000B
+0035                       315     Test2ClB:
+0035 BBCF00                316             MOV BX, VAL2
+                           317 +1      
+0038 8BD3                  318 +2          MOV DX, BX
+003A B80100                319 +1      MOV AX, 1 
+003D C1E006                320 +2      SHL AX,  6 ; only bit set in AX is #bit
+0040 F7D0                  321 +1          NOT AX ; sets AX to its complement so all bits are set except AX
+0042 23D0                  322 +1      AND DX, AX ; anding something with 1 retains its value, and anding
+                           323 +1                             ; something with 0 sets its value to 0. this ensures all
+                           324 +1                             ; bits remain the same except #bit (because all other
+                           325 +1                             ; bits are anded with 1), and that #bit is anded with
+                           326 +1                             ; 0
+0044 8BDA                  327 +2          MOV BX, DX
+                           328 +1   ; should change BX from 11000111 to 10000111 (cf to 8f)
+                           329     
+0046                       330     TestComBit:
+0046                       331     Test1CB:
+0046 BB8F00                332             MOV BX, VAL1
+                           333 +1      
+0049 8BD3                  334 +2          MOV DX, BX
+004B B80100                335 +1      MOV AX, 1
+004E C1E006                336 +2      SHL AX,  6 ; only bit set in AX is #bit
+0051 33D0                  337 +1      XOR DX, AX   ; anything x-ored with 0 retains its value.
+                           338 +1                                   ; AX is 0 except for at #bit. 
+                           339 +1                   ; xor will make sure everything stays the same except
+                           340 +1                   ; #bit. if bit is 0, it will be 1, and if 1, it will be 0
+0053 8BDA                  341 +2          MOV BX, DX
+                           342 +1   ; should change BX from 10001111 to 11001111 (8f to cf)
+0055                       343     Test2CB: 
+0055 BBCF00                344             MOV BX, VAL2
+                           345 +1      
+0058 8BD3                  346 +2          MOV DX, BX
+005A B80100                347 +1      MOV AX, 1
+005D C1E006                348 +2      SHL AX,  6 ; only bit set in AX is #bit
+0060 33D0                  349 +1      XOR DX, AX   ; anything x-ored with 0 retains its value.
+                           350 +1                                   ; AX is 0 except for at #bit. 
+                           351 +1                   ; xor will make sure everything stays the same except
+                           352 +1                   ; #bit. if bit is 0, it will be 1, and if 1, it will be 0
+0062 8BDA                  353 +2          MOV BX, DX
+                           354 +1   ; should change BX from 11000111 to 10000111 (cf to 8f)
+                           355     
+0064                       356     TestTestBit:
+0064                       357     Test1TB:
+0064 BB8F00                358             MOV BX, VAL1
+                           359 +1      
+0067 B80100                360 +1          MOV AX, 1
+006A C1E006                361 +2          SHL AX,  6 ;all bits cleared in AX except #bit
+006D 8BDB                  362 +2          MOV BX, BX 
+006F 23D8                  363 +1          AND BX, AX ; masks all bits except #bit
+8086/87/88/186 MACRO ASSEMBLER    MACROS                                                   20:39:31  11/23/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           364 +1                                     ; bx will be 0 if #bit is not set, and 1 if it is
+0071 B90000                365 +1                  MOV CX, 0
+0074 3BD9                  366 +1          CMP BX, CX ; sets zero flag if bit of AX is 0 and resets flag if bit
+                           367 +1                     ; is 1
+                           368 +1  
+                           369 +1   ; bit not set, so should set zero flag
+0076                       370     Test2TB:
+0076 BBCF00                371             MOV BX, VAL2
+                           372 +1      
+0079 B80100                373 +1          MOV AX, 1
+007C C1E006                374 +2          SHL AX,  6 ;all bits cleared in AX except #bit
+007F 8BDB                  375 +2          MOV BX, BX 
+0081 23D8                  376 +1          AND BX, AX ; masks all bits except #bit
+                           377 +1                                     ; bx will be 0 if #bit is not set, and 1 if it is
+0083 B90000                378 +1                  MOV CX, 0
+0086 3BD9                  379 +1          CMP BX, CX ; sets zero flag if bit of AX is 0 and resets flag if bit
+                           380 +1                     ; is 1
+                           381 +1  
+                           382 +1   ; bit set, so should reset zero flag
+                           383     
+0088                       384     TestXLATW:
+0088                       385     TestX1: 
+0088 B80000                386             MOV AX, 0
+008B BBAB0090       R      387             MOV BX, offset(MotorForcesX_Table)
+                           388 +1          
+008F 03D8                  389 +1                  ADD BX, AX ; adds AX to address of table because that is the location
+                           390 +1                                     ; of the table value corresponding to AX
+0091 2E8B07                391 +1                  MOV AX, word ptr CS:[BX] ; sets AX to offset of AX in table 
+                           392 +1                                                                   ; (pointed to by BX)
+                           393 +1   ; AX should store 7FFFH
+0094                       394     TestX2:
+0094 B80200                395             MOV AX, 2
+0097 BBAB0090       R      396             MOV BX, offset(MotorForcesX_Table)
+                           397 +1          
+009B 03D8                  398 +1                  ADD BX, AX ; adds AX to address of table because that is the location
+                           399 +1                                     ; of the table value corresponding to AX
+009D 2E8B07                400 +1                  MOV AX, word ptr CS:[BX] ; sets AX to offset of AX in table 
+                           401 +1                                                                   ; (pointed to by BX)
+                           402 +1   ; AX should store C000H
+                           403             
+                           404     ; 00FF3CH: I2CON register
+00A0                       405     TestReadPCB:
+                           406 +1      
+00A0 BA3CFF                407 +2                  MOV DX, 0FF3CH
+00A3 ED                    408 +1          IN AX, DX ; reads in value at address DX
+                           409 +1   ; read in INT 2 CTRL register
+                           410     
+00A4                       411     TestWritePCB:
+                           412 +1      
+00A4 BA3CFF                413 +2                  MOV DX, 0FF3CH
+00A7 B80600                414 +2                  MOV AX,  6
+00AA EF                    415 +1          OUT DX, AX ; outputs value in AX to address DX
+                           416 +1   ; Int 2 CTRL register should be 6
+                           417     
+                           418     
+8086/87/88/186 MACRO ASSEMBLER    MACROS                                                   20:39:31  11/23/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           419     
+                           420     TestMacros      ENDP
+                           421     
+                           422     ; MotorForcesX_Table (used to test xlatw)
+                           423     ;
+                           424     ; Description:      These are the components of horizontal
+                           425     ;                   force given to each motor.
+                           426     ;
+                           427     ;
+                           428     ; Notes:            READ ONLY tables should always be in the code segment so
+                           429     ;                   that in a standalone system it will be located in the
+                           430     ;                   ROM with the code.
+                           431     ;
+                           432     ; Author:           Meera Krishnamoorthy
+                           433     ; Last Modified:    11/12/16
+                           434     
+00AB                       435     MotorForcesX_Table       LABEL   WORD
+                           436             PUBLIC  MotorForcesX_Table
+                           437     
+00AB FF7F                  438     DW          7FFFH        ; F_1_x
+00AD 00C0                  439     DW          0C000H       ; F_2_x
+00AF 00C0                  440     DW          0C000H       ; F_3_x
+                           441     
+----                       442     CODE    ENDS
+                           443     
+                           444     
+                           445     ;the data segment
+                           446     
+----                       447     DATA    SEGMENT PUBLIC  'DATA'
+                           448     
+                           449     
+----                       450     DATA    ENDS
+                           451     
+                           452     
+                           453     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

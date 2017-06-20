@@ -1,0 +1,129 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     22:09:44  12/04/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN
+OBJECT MODULE PLACED IN MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                 MAIN LOOP                                  ;
+                             5     ;                       Used to test Homework 5 (Keypad)                    ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      This is the main loop used to execute keypad and 
+                            11     ;                   display code. It calls the initialization functions for the
+                            12     ;                   display and keypad. Once the event handler and timer are
+                            13     ;                   set up, this function can run infinitely. Keys are pressed
+                            14     ;                   on the keypad which are stored in the string buffer/ 
+                            15     ;                   and displayed on the display. 
+                            16     ; Input:            None.
+                            17     ; Output:           None.
+                            18     ;
+                            19     ; User Interface:   No real user interface.
+                            20     ; Error Handling:   None. 
+                            21     ;
+                            22     ; Algorithms:       None.
+                            23     ; Data Structures:  None.
+                            24     ;
+                            25     ; Known Bugs:       None.
+                            26     ; Limitations:      None.
+                            27     ;
+                            28     ; Revision History:
+                            29     ;    10/22/16       Meera Krishnamoorthy    created file based on Homework 2
+                            30     ;                                           test code and modified
+                            31     
+                            32     
+                            33     
+                            34     ;definitions
+                            35     
+                            36     CGROUP  GROUP   CODE
+                            37     DGROUP  GROUP   DATA
+                            38          
+----                        39     CODE    SEGMENT PUBLIC 'CODE'
+                            40             EXTRN   InitCS:NEAR
+                            41             EXTRN   ClrIRQVectors:NEAR
+                            42             EXTRN   InstallKeypadDisplayHandler:NEAR
+                            43             EXTRN   InitTimer:Near
+                            44             EXTRN   InitDisplay:NEAR
+                            45             EXTRN   InitKeypad:NEAR
+                            46             ASSUME  CS:CGROUP, DS:DGROUP
+                            47             EXTRN   KeyTest:NEAR
+                            48             
+                            49     ;external function declarations
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     22:09:44  12/04/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+0000                        52     START:  
+                            53     
+0000                        54     MAIN:
+0000 FA                     55             CLI
+0001 B8----         R       56             MOV     AX, STACK               ;initialize the stack pointer
+0004 8ED0                   57             MOV     SS, AX
+0006 BCE00190       R       58             MOV     SP, OFFSET(TopOfStack)
+                            59     
+000A B8----         R       60             MOV     AX, DGROUP                ;initialize the data segment
+000D 8ED8                   61             MOV     DS, AX
+                            62     
+000F E80000         E       63             CALL    InitCS                  ;initialize the 80188 chip selects
+                            64                                             ;assumes LCS and UCS already setup
+                            65     
+0012 E80000         E       66             CALL    ClrIRQVectors           ;clear (initialize) interrupt vector table
+                            67     
+                            68                                             
+0015 E80000         E       69             Call    InitDisplay           ;initialize the variables for the timer 
+                            70                                             ;event handler
+0018 E80000         E       71             Call    InitKeypad
+                            72     
+001B E80000         E       73             CALL    InstallKeypadDisplayHandler          ;install the event handler
+                            74                                             ;   ALWAYS install handlers before
+                            75                                             ;   allowing the hardware to interrupt.
+                            76     
+001E E80000         E       77             CALL    InitTimer               ;initialize the internal timer
+0021 FB                     78             STI                             ;and finally allow interrupts.
+                            79             ;CALL    KeyTest
+0022 EBFE                   80             Forever: JMP    Forever         ;sit in an infinite loop, nothing to
+                            81                                             ;do in the background routine
+0024 F4                     82             HLT                             ;never executed (hopefully)
+                            83     
+----                        84     CODE ENDS
+                            85     ;the data segment. initialized because used later on. 
+                            86     
+----                        87     DATA    SEGMENT PUBLIC  'DATA'
+                            88     
+                            89     
+----                        90     DATA    ENDS
+                            91     
+                            92     
+                            93     ;the stack
+                            94     
+----                        95     STACK   SEGMENT STACK  'STACK'
+                            96     
+0000 (80                    97                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                            98     
+01E0                        99     TopOfStack      LABEL   WORD
+                           100     
+----                       101     STACK   ENDS
+                           102     
+                           103     
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     22:09:44  12/04/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           104     
+                           105     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

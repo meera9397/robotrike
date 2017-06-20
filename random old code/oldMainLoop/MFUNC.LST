@@ -1,0 +1,772 @@
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MFUNC
+OBJECT MODULE PLACED IN MFUNC.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MFUNC.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    MFUNC
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                                                            ;
+                             6     ;                                   EE/CS 51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     
+                            11     ; file description including table of contents
+                            12     ;
+                            13     ; Revision History:
+                            14     ;
+                            15     ;
+                            16     
+                            17     CGROUP  GROUP   CODE
+                            18     DGROUP  GROUP   DATA
+                            19     
+                            20     
+----                        21     CODE    SEGMENT PUBLIC 'CODE'
+                            22     
+                            23     EXTRN   QueueInit:NEAR
+                            24     EXTRN   Enqueue:NEAR
+                            25     EXTRN   Dequeue:NEAR
+                            26     EXTRN   QueueFull:NEAR
+                            27     EXTRN   QueueEmpty:NEAR
+                            28     EXTRN   Display:NEAR
+                            29     
+                            30     EXTRN   GetMotorSpeed:NEAR
+                            31     EXTRN   GetMotorDirection:NEAR
+                            32     EXTRN   GetLaser:NEAR
+                            33     EXTRN   Dec2String:NEAR
+                            34     EXTRN   SerialPutChar:NEAR
+                            35     
+                            36 +1  $INCLUDE(MAIN9.inc)
+                      =1    37     
+                      =1    38     
+                      =1    39     
+  007B                =1    40     CRITICAL_FLAG       EQU 123
+  0045                =1    41     ASCII_E             EQU 69
+  000D                =1    42     CARRIAGE_RETURN     EQU 13
+  0000                =1    43     ASCII_NULL          EQU 0
+  000F                =1    44     MAX_KEY_PRESS       EQU 15
+  0064                =1    45     DISPLAY_LEN         EQU 100
+  0005                =1    46     badkey_len          EQU 5
+  0002                =1    47     off_len             EQU 2
+  0001                =1    48     on_len              EQU 1
+                            49 +1  $INCLUDE(queues.inc)
+                      =1    50     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;                                  QUEUES.INC                                ;  
+                      =1    52     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    53     
+                      =1    54     ; This file contains constants for the functions needed to initialize and use
+                      =1    55     ; a queue (which are defined in queues.asm)
+                      =1    56     ;
+                      =1    57     ; Revision History:
+                      =1    58     ;    10/22/16  Meera Krishnamoorthy updated constants/ queue structure
+                      =1    59     
+                      =1    60     
+  0201                =1    61     queue_size equ 513 ; this variable describes the size of the queue
+  0002                =1    62     word_len equ 2 ; the size of a word is 2x the size of a bytes
+  0001                =1    63     byte_len equ 1 ; the size of a byte is set to "1"
+                      =1    64     
+                      =1    65     ; The following structure creates a queue with the following attributes:
+                      =1    66     ; 1) len: the total length the queue can be
+                      =1    67     ; 2) element_size: if this variable is 0, the element size is bytes. if this
+                      =1    68     ;                  variable is 1, then the element size is words.
+                      =1    69     ; 3) front: head pointer for queue
+                      =1    70     ; 4) rear: tail pointer for queue
+                      =1    71     ; 5) elements: the array to put all elements of the queue in 
+                      =1    72     ; 
+----                  =1    73     QueueStruct         STRUC
+0000                  =1    74         len             DW      ?
+0002                  =1    75         element_size    DW      ?
+0004                  =1    76         front           DW      ?
+0006                  =1    77         rear            DW      ?
+0008                  =1    78         elements        DB      (queue_size) DUP (?)
+----                  =1    79     QueueStruct ENDS
+                            80     
+                            81     ASSUME  CS:CGROUP, DS:DGROUP
+                            82     
+                            83     ; Function Name: InitEventQueue
+                            84     ; Description: This function initializes the event queue using a pre-existing
+                            85     ; function QueueInit. The reason that this function exists is to specify
+                            86     ; the address of the event queue, so that remote functions can access
+                            87     ; the event queue without the event queue having to become a
+                            88     ; global structure.
+                            89     ;
+                            90     ; Operational Description: This function does this by setting up the registers
+                            91     ; appropriately (with the address of the queue in SI, the length of the
+                            92     ; queue in AX, and the element size in BX), and then calling the
+                            93     ; already existing function QueueInit to create a queue structure.
+                            94     ;
+                            95     ; Arguments: AX: length of queue
+                            96     ;            BX: element size
+                            97     ;            SI: address of queue
+                            98     ; Return Values: None.
+                            99     ; Global Variables: None.
+                           100     ; Shared Variables: None.
+                           101     ; Local Variables: None.
+                           102     ;
+                           103     ; Inputs: None.
+                           104     ; Outputs: None.
+                           105     ; User Interface: None.
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     ; Error Handling: None.
+                           107     ; Algorithms: None.
+                           108     ;
+                           109     ; Data Structures: None.
+                           110     ; Limitations: None.
+                           111     ; Known Bugs: None.
+                           112     ; Registers used:
+                           113     ;
+                           114     ; Author: Meera Krishnamoorthy
+                           115     ; Last Modified: 10/17/16
+                           116     ;
+                           117     
+0000                       118     InitEventQueue      PROC        NEAR
+                           119             PUBLIC      InitEventQueue
+                           120     
+0000 8D360300       R      121     LEA SI, EventQueue
+0004 B80102                122     MOV AX, queue_size
+0007 BB0200                123     MOV BX, word_len
+000A E80000         E      124     CALL QueueInit
+                           125     
+000D C3                    126     RET
+                           127     
+                           128     InitEventQueue  ENDP
+                           129     
+                           130     
+                           131     ; EventQueueEmpty
+                           132     ; Description: This function checks if the event queue is empty using a pre
+                           133     ; existing function QueueEmpty. The reason that this function exists is to specify
+                           134     ; the address of the event queue, so that remote functions can access
+                           135     ; the event queue without the event queue having to become a
+                           136     ; global structure.
+                           137     ;
+                           138     ; Operational Description: This function does this by putting the address
+                           139     ; of the event queue in SI, and calling the already written function
+                           140     ; QueueEmpty to check if the event queue is empty. The zero flag is set if
+                           141     ; the queue is empty, and reset if the queue is not empty.
+                           142     ;
+                           143     ; Arguments: None.
+                           144     ; Return Values: None.
+                           145     ; Global Variables: None.
+                           146     ; Shared Variables: None.
+                           147     ; Local Variables: None.
+                           148     ;
+                           149     ; Inputs: None.
+                           150     ; Outputs: None.
+                           151     ; User Interface: None.
+                           152     ; Error Handling: None.
+                           153     ; Algorithms: None.
+                           154     ;
+                           155     ; Data Structures: None.
+                           156     ; Limitations: None.
+                           157     ; Known Bugs: None.
+                           158     ; Registers used: SI, flags
+                           159     ;
+                           160     ; Author: Meera Krishnamoorthy
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161     ; Last Modified: 10/17/16
+                           162     ;
+                           163     
+000E                       164     EventQueueEmpty      PROC        NEAR
+                           165             PUBLIC      EventQueueEmpty
+                           166     
+000E 8D360300       R      167     LEA SI, EventQueue
+0012 E80000         E      168     CALL QueueEmpty
+                           169     
+0015 C3                    170     RET
+                           171     
+                           172     EventQueueEmpty ENDP
+                           173     
+                           174     ; EventQueueFull
+                           175     ; Description: This function checks if the event queue is full.
+                           176     ; The reason that this function exists is to specify
+                           177     ; the address of the event queue, so that remote functions can access
+                           178     ; the event queue without the event queue having to become a global structure.
+                           179     ;
+                           180     ; Operational Description: This function does this by using the preexisting
+                           181     ; function QueueFull, putting the address of the Event Queue in SI because
+                           182     ; this is how QueueFull is called.
+                           183     ;
+                           184     ; Arguments: SI: address of EventQueue
+                           185     ; Return Values: None.
+                           186     ; Global Variables: None.
+                           187     ; Shared Variables: None.
+                           188     ; Local Variables: None.
+                           189     ;
+                           190     ; Inputs: None.
+                           191     ; Outputs: None.
+                           192     ; User Interface: None.
+                           193     ; Error Handling: None.
+                           194     ; Algorithms: None.
+                           195     ;
+                           196     ; Data Structures: None.
+                           197     ; Limitations: None.
+                           198     ; Known Bugs: None.
+                           199     ; Registers used:
+                           200     ;
+                           201     ; Author: Meera Krishnamoorthy
+                           202     ; Last Modified: 10/17/16
+                           203     ;
+                           204     
+0016                       205     EventQueueFull      PROC        NEAR
+                           206             PUBLIC      EventQueueFull
+                           207     
+0016 8D360300       R      208     LEA SI, EventQueue
+001A E80000         E      209     CALL QueueFull
+                           210     
+001D C3                    211     RET
+                           212     
+                           213     EventQueueFull  ENDP
+                           214     
+                           215     
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     ; EnqueueEvent
+                           217     ; Description: This function enqueues an event to the event queue, assuming
+                           218     ; that the value to be enqueued is in AX.
+                           219     ; The reason that this function exists is to specify
+                           220     ; the address of the event queue, so that remote functions can access
+                           221     ; the event queue without the event queue having to become a global structure.
+                           222     ;
+                           223     ; Operational Description: This function does this by putting the address
+                           224     ; of the event queue in SI, and calling the already written function
+                           225     ; Enqueue that enqueues an event to the event queue if the queue is not
+                           226     ; full.
+                           227     ;
+                           228     ; Arguments: None.
+                           229     ; Return Values: None.
+                           230     ; Global Variables: None.
+                           231     ; Shared Variables: None.
+                           232     ; Local Variables: None.
+                           233     ;
+                           234     ; Inputs: None.
+                           235     ; Outputs: None.
+                           236     ; User Interface: None.
+                           237     ; Error Handling: None.
+                           238     ; Algorithms: None.
+                           239     ;
+                           240     ; Data Structures: None.
+                           241     ; Limitations: None.
+                           242     ; Known Bugs: None.
+                           243     ; Registers used: SI, flags
+                           244     ;
+                           245     ; Author: Meera Krishnamoorthy
+                           246     ; Last Modified: 10/17/16
+                           247     ;
+                           248     
+001E                       249     EnqueueEvent      PROC        NEAR
+                           250             PUBLIC      EnqueueEvent
+                           251     
+001E                       252     InitEnqueueEvent:
+001E E8F5FF                253         CALL EventQueueFull
+0021 7407                  254         JE EndEnqueueEvent
+0023                       255     CanEnqueue:
+0023 8D360300       R      256         LEA SI, EventQueue
+0027 E80000         E      257         CALL Enqueue
+002A                       258     EndEnqueueEvent:
+002A C3                    259         RET
+                           260     
+                           261     EnqueueEvent    ENDP
+                           262     
+                           263     
+                           264     ; Function Name: DequeueEvent
+                           265     ; Description: This function dequeues an event from the event queue.
+                           266     ; The reason that this function exists is to specify
+                           267     ; the address of the event queue, so that remote functions can access
+                           268     ; the event queue without the event queue having to become a global structure.
+                           269     ;
+                           270     ; Operational Description:  This function does this by putting the address
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           271     ; of the event queue in SI, and calling the already written function
+                           272     ; Dequeue that dequeues an event to the event queue if the queue is not
+                           273     ; empty.
+                           274     ;
+                           275     ; Arguments: None.
+                           276     ; Return Values: None.
+                           277     ; Global Variables: None.
+                           278     ; Shared Variables: None.
+                           279     ; Local Variables: None.
+                           280     ;
+                           281     ; Inputs: None.
+                           282     ; Outputs: None.
+                           283     ; User Interface: None.
+                           284     ; Error Handling: None.
+                           285     ; Algorithms: None.
+                           286     ;
+                           287     ; Data Structures: None.
+                           288     ; Limitations: None.
+                           289     ; Known Bugs: None.
+                           290     ; Registers used: SI, flags
+                           291     ;
+                           292     ; Author: Meera Krishnamoorthy
+                           293     ; Last Modified: 10/17/16
+                           294     ;
+                           295     
+002B                       296     DequeueEvent      PROC        NEAR
+                           297             PUBLIC      DequeueEvent
+                           298     
+002B                       299     InitDequeueEvent:
+002B E8E0FF                300         CALL EventQueueEmpty
+002E 7407                  301         JE EndDequeueEvent
+0030                       302     CanDequeue:
+0030 8D360300       R      303         LEA SI, EventQueue
+0034 E80000         E      304         CALL Dequeue
+0037                       305     EndDequeueEvent:
+0037 C3                    306         RET
+                           307     
+                           308     DequeueEvent    ENDP
+                           309     
+                           310     
+                           311     ; GetKeyPress
+                           312     ; Description: This function is called whenever the event queue dequeues
+                           313     ; a key press event. This function converts a key press event into a command
+                           314     ; that the motor will be able to parse. This is done using various tables
+                           315     ; After the command is found, SerialPutString is called to put the
+                           316     ; command into the serial channel.
+                           317     ;
+                           318     ; Operational Description:
+                           319     ;
+                           320     ; Arguments: AL: key press to decode
+                           321     ; Return Values: None
+                           322     ; Global Variables: None.
+                           323     ; Shared Variables: None.
+                           324     ; Local Variables: None.
+                           325     ;
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           326     ; Inputs: None.
+                           327     ; Outputs: None.
+                           328     ; User Interface: None.
+                           329     ; Error Handling: None.
+                           330     ; Algorithms: None.
+                           331     ;
+                           332     ; Data Structures: None.
+                           333     ; Limitations: None.
+                           334     ; Known Bugs: None.
+                           335     ; Registers used:
+                           336     ;
+                           337     ; Author: Meera Krishnamoorthy
+                           338     ; Last Modified: 10/17/16
+                           339     ;
+                           340     
+0038                       341     GetKeyPress      PROC        NEAR
+                           342             PUBLIC      GetKeyPress
+                           343             
+0038 BB0000                344     MOV BX, 0
+003B                       345     CheckKeyPress:
+003B 2E8A8FDC00     R      346         MOV CL, CS:AllKeyPresses[BX]
+0040 3AC1                  347         CMP AL, CL
+0042 7408                  348         JE GetKeyString
+0044 83FB0F                349         CMP BX, MAX_KEY_PRESS
+0047 7440                  350         JE NoKeyPress
+0049 43                    351         INC BX
+004A EBEF                  352         JMP CheckKeyPress
+004C                       353     GetKeyString:
+004C 3CD3                  354         CMP AL, 0D3H
+004E 7417                  355         JE DisplaySpeed
+0050 3CB3                  356         CMP AL, 0B3H
+0052 741D                  357         JE DisplayDirection
+0054 3C73                  358         CMP AL, 073H
+0056 7423                  359         JE DisplayLaser
+0058 C1E302                360         SHL BX, 2 ; get word index for table
+005B BEEC0090       R      361         MOV SI, offset(KeyPressTable)
+005F 03F3                  362         ADD SI, BX
+0061 E85B00                363         Call SerialPutStringRemote
+0064 EB2C90                364         JMP EndGetKeyPress
+                           365     
+0067                       366     DisplaySpeed:
+0067 56                    367         PUSH SI
+0068 E80000         E      368         Call GetMotorSpeed
+006B C60453                369         MOV byte ptr [SI], 'S'
+006E EB1290                370         JMP GetReadyDisplay
+                           371     
+0071                       372     DisplayDirection:
+0071 56                    373         PUSH SI
+0072 E80000         E      374         Call GetMotorDirection
+0075 C60444                375         MOV byte ptr [SI], 'D'
+0078 EB0890                376         JMP GetReadyDisplay
+                           377         
+007B                       378     DisplayLaser:
+007B 56                    379         PUSH SI
+007C E80000         E      380         Call GetLaser
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+007F C6044C                381         MOV byte ptr [SI], 'L'
+                           382          
+0082                       383     GetReadyDisplay:
+0082 46                    384         INC SI
+0083 E80000         E      385         Call Dec2String
+0086 EB0490                386         JMP AllDisplay
+                           387     
+0089                       388     NoKeyPress:
+0089 BE5800                389         MOV SI, 'X'
+                           390         
+008C                       391     AllDisplay:
+008C 5E                    392         POP SI
+008D 1E                    393         PUSH DS
+008E 07                    394         POP ES
+008F E80000         E      395         Call Display
+                           396     
+0092                       397     EndGetKeyPress:  
+0092 C3                    398         RET
+                           399     
+                           400         
+                           401             
+                           402     GetKeyPress     ENDP
+                           403     
+                           404     
+                           405     ; GetError
+                           406     ; Description: This function displays the value of the event (which is
+                           407     ; usually the line status register) on the display, preceded by an "E"
+                           408     ; to indicate error.
+                           409     ;
+                           410     ; Operational Description: This is done by moving "E" and the value of the
+                           411     ; error event (in AL previously), into the stringbuffer, and then
+                           412     ; calling Display to display the string. The value in AL has to be converted
+                           413     ; to a string using "HexToString"
+                           414     ;
+                           415     ; Arguments: AL: values to display
+                           416     ; Return Values: None.
+                           417     ; Global Variables: None.
+                           418     ; Shared Variables: None.
+                           419     ; Local Variables: None.
+                           420     ;
+                           421     ; Inputs: None.
+                           422     ; Outputs: None.
+                           423     ; User Interface: None.
+                           424     ; Error Handling: None.
+                           425     ; Algorithms: None.
+                           426     ;
+                           427     ; Data Structures: None.
+                           428     ; Limitations: None.
+                           429     ; Known Bugs: None.
+                           430     ; Registers used:
+                           431     ;
+                           432     ; Author: Meera Krishnamoorthy
+                           433     ; Last Modified: 10/17/16
+                           434     ;
+                           435     
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0093                       436     GetError      PROC        NEAR
+                           437             PUBLIC      GetError
+                           438     
+0093 BE4500                439     MOV SI, ASCII_E
+0096 8BCE                  440     MOV CX, SI
+0098 41                    441     INC CX
+0099 B400                  442     MOV AH, 0 ; clear high byte of AH because all we need is AH
+009B 8BC8                  443     MOV CX, AX
+009D 1E                    444     PUSH DS
+009E 07                    445     POP ES
+009F E80000         E      446     Call Display ; will display stringbuffer
+                           447     
+00A2 C3                    448     RET
+                           449     
+                           450     GetError        ENDP
+                           451     
+                           452     
+                           453     ; GetReceivedData
+                           454     ; Description: This function displays the received data on the display.
+                           455     ; The received data is in the form of a command (from the motor side), which
+                           456     ; is in a string, so the entire string is read in, and then is displayed.
+                           457     ; We assume the characters of the string are sent in order, so we put
+                           458     ; them in the string buffer in order, and then display once a carriage
+                           459     ; return is sent.
+                           460     ;
+                           461     ; Operational Description: THe string is read in and stored in the string
+                           462     ; buffer by storing characters when this function is called until
+                           463     ; a character equals a carriage return. Then, a null character is added to the
+                           464     ; end of the string buffer and it is displayed.
+                           465     ;
+                           466     ; Arguments: AL: characters to display
+                           467     ; Return Values: None.
+                           468     ; Global Variables: None.
+                           469     ; Shared Variables: rdindex: saves our index in the string buffer (so we know
+                           470     ;                   how much of a string we've stored)
+                           471     ; Local Variables: None.
+                           472     ;
+                           473     ; Inputs: None.
+                           474     ; Outputs: None.
+                           475     ; User Interface: None.
+                           476     ; Error Handling: None.
+                           477     ; Algorithms: None.
+                           478     ;
+                           479     ; Data Structures: None.
+                           480     ; Limitations: None.
+                           481     ; Known Bugs: None.
+                           482     ; Registers used:
+                           483     ;
+                           484     ; Author: Meera Krishnamoorthy
+                           485     ; Last Modified: 10/17/16
+                           486     ;
+                           487     
+00A3                       488     GetReceivedData      PROC        NEAR
+                           489             PUBLIC      GetReceivedData
+                           490     
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00A3                       491     IntGetReceivedData: 
+00A3 8BCE                  492         MOV CX, SI
+00A5 030E0100       R      493         ADD CX, rdindex   ; increment SI
+00A9 8AC8                  494         MOV CL, AL
+00AB 3C00                  495         CMP AL, ASCII_NULL ;(carriage return)
+00AD 750B                  496         JNE ContAddString
+00AF B90000                497         MOV CX, ASCII_NULL ;(to indicate end of the string)
+                           498         
+00B2 1E                    499         PUSH DS
+00B3 07                    500         POP ES
+                           501         
+00B4 E80000         E      502         Call Display ; will display stringbuffer (starting at SI)
+                           503         
+00B7 EB0590                504         JMP EndGetReceivedData
+                           505     
+00BA                       506     ContAddString:
+00BA FF060100       R      507         INC rdindex ; increment index of SI
+                           508         
+00BE                       509     EndGetReceivedData: 
+00BE C3                    510         RET
+                           511     
+                           512     GetReceivedData ENDP
+                           513     
+                           514     
+                           515     ; SerialPutStringRemote
+                           516     ; Description: This function sends a series of characters over the serial
+                           517     ; channel from the remote unit to the motor unit.
+                           518     ;
+                           519     ; Operational Description: This is done using the already written function
+                           520     ; SerialPutChar, which puts characters into the serial channel. It continues
+                           521     ; to call SerialPutChar until all characters in the string have been sent
+                           522     ; over. Then it adds a carriage return to the end of the string (because
+                           523     ; that's how the parser knows the command is done) and calls SerialPutChar.
+                           524     ;
+                           525     ; Arguments: None.
+                           526     ; Return Values: None.
+                           527     ; Global Variables: None.
+                           528     ; Shared Variables: remoteindex: saves our index in the string buffer (so we know
+                           529     ;                   how much of a string we've stored)
+                           530     ; Local Variables: None.
+                           531     ;
+                           532     ; Inputs: None.
+                           533     ; Outputs: None.
+                           534     ; User Interface: None.
+                           535     ; Error Handling: None.
+                           536     ; Algorithms: None.
+                           537     ;
+                           538     ; Data Structures: None.
+                           539     ; Limitations: None.
+                           540     ; Known Bugs: None.
+                           541     ; Registers used: SI
+                           542     ;
+                           543     ; Author: Meera Krishnamoorthy
+                           544     ; Last Modified: 10/17/16
+                           545     ;
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           546     
+00BF                       547     SerialPutStringRemote      PROC        NEAR
+                           548             PUBLIC      SerialPutStringRemote
+                           549             
+00BF                       550     ContSerialPutStringRemote:
+00BF 803C00                551         CMP byte ptr [SI], ASCII_NULL
+00C2 7408                  552         JE AddCR
+00C4 8A04                  553         MOV AL, byte ptr [SI]
+00C6 46                    554         INC SI
+00C7 E80000         E      555         Call SerialPutChar
+00CA EBF3                  556         JMP ContSerialPutStringRemote
+                           557         
+00CC                       558     AddCR:
+00CC BE0D00                559         MOV SI, CARRIAGE_RETURN
+00CF E80000         E      560         Call SerialPutChar
+                           561       
+00D2                       562     EndSerialPutStringRemote:   
+00D2 C3                    563         RET
+                           564     
+                           565     SerialPutStringRemote   ENDP
+                           566     
+                           567     ; CheckCriticalFlag
+                           568     ; Description: 
+                           569     ;
+                           570     ; Operational Description: 
+                           571     ;
+                           572     ; Arguments: None.
+                           573     ; Return Values: None.
+                           574     ; Global Variables: None.
+                           575     ; Shared Variables: 
+                           576     ; Local Variables: None.
+                           577     ;
+                           578     ; Inputs: None.
+                           579     ; Outputs: None.
+                           580     ; User Interface: None.
+                           581     ; Error Handling: None.
+                           582     ; Algorithms: None.
+                           583     ;
+                           584     ; Data Structures: None.
+                           585     ; Limitations: None.
+                           586     ; Known Bugs: None.
+                           587     ; Registers used: SI
+                           588     ;
+                           589     ; Author: Meera Krishnamoorthy
+                           590     ; Last Modified: 10/17/16
+                           591     ;
+                           592     
+00D3                       593     CheckCriticalFlag      PROC        NEAR
+                           594             PUBLIC      CheckCriticalFlag
+                           595             
+00D3                       596     ConfirmQueueStatus:
+00D3 E840FF                597         Call EventQueueFull
+00D6 7503                  598         JNZ EndCriticalFlag 
+00D8 B87B00                599         MOV AX, CRITICAL_FLAG
+00DB                       600     EndCriticalFlag: 
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00DB C3                    601         RET
+                           602     
+                           603     CheckCriticalFlag       ENDP
+                           604     
+                           605     ; AllKeyPresses
+                           606     ;
+                           607     ; Description:      This table has a list of all key presess
+                           608     ;
+                           609     ; Notes:            READ ONLY tables should always be in the code segment so
+                           610     ;                   that in a standalone system it will be located in the
+                           611     ;                   ROM with the code.
+                           612     ;
+                           613     ; Author:           Meera Krishnamoorthy
+                           614     ; Last Modified:    11/12/16
+                           615     
+00DC                       616     AllKeyPresses       LABEL   BYTE
+                           617             PUBLIC  AllKeyPresses
+                           618     
+00DC E0                    619     DB          0E0H       
+00DD D0                    620     DB          0D0H      
+00DE B0                    621     DB          0B0H
+00DF 70                    622     DB          070H
+                           623            
+00E0 E1                    624     DB          0E1H       
+00E1 D1                    625     DB          0D1H        
+00E2 B1                    626     DB          0B1H
+00E3 71                    627     DB          071H
+                           628           
+00E4 E2                    629     DB          0E2H       
+00E5 D2                    630     DB          0D2H       
+00E6 B2                    631     DB          0B2H
+00E7 72                    632     DB          072H
+                           633           
+00E8 E3                    634     DB          0E3H       
+00E9 D3                    635     DB          0D3H       
+00EA B3                    636     DB          0B3H
+00EB 73                    637     DB          073H
+                           638     
+                           639     
+                           640     ; KeyPressTable
+                           641     ;
+                           642     ; Description:      This table has a list of all key presess
+                           643     ;
+                           644     ; Notes:            READ ONLY tables should always be in the code segment so
+                           645     ;                   that in a standalone system it will be located in the
+                           646     ;                   ROM with the code.
+                           647     ;
+                           648     ; Author:           Meera Krishnamoorthy
+                           649     ; Last Modified:    11/12/16
+                           650     
+00EC                       651     KeyPressTable       LABEL   BYTE
+                           652             PUBLIC  KeyPressTable
+                           653             
+00EC 533130                654     DB 'S10'                  
+00EF 532D313030            655     DB 'S-100'                   
+8086/87/88/186 MACRO ASSEMBLER    MFUNC                                                    19:31:07  12/03/;6  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00F4 5331303030            656     DB 'S1000'               
+00F9 533635353334          657     DB 'S65534'
+                           658     
+00FF 563130                659     DB 'V10'               
+0102 562D313030            660     DB 'V-100'
+0107 5631303030            661     DB 'V1000'      
+010C 563333303030          662     DB 'V33000'             
+                           663     
+0112 443130                664     DB 'D10'             
+0115 442D313030            665     DB 'D-100'                    
+011A 443333303030          666     DB 'D33000'           
+0120 46                    667     DB 'F'
+                           668     
+0121 4F                    669     DB 'O'
+0122 444953505F53          670     DB 'DISP_S'      
+0128 444953505F44          671     DB 'DISP_D'     
+012E 444953505F4C          672     DB 'DISP_L'        
+                           673         
+                           674     
+                           675     
+                           676         
+                           677             
+                           678     
+----                       679     CODE    ENDS
+                           680     
+                           681     ;the data segment
+                           682     
+----                       683     DATA    SEGMENT PUBLIC  'DATA'
+                           684     
+0000 ??                    685     stringbuffer2    DB      ?  
+0001 ????                  686     rdindex          DW      ?
+0003 ????                  687     EventQueue QueueStruct <>  ; creates an instance of the queue structure   
+0005 ????
+0007 ????
+0009 ????
+000B (513
+     ??
+     )
+                           688                                ; to be used to hold events that occur
+                           689                                  
+                           690     
+----                       691     DATA    ENDS
+                           692     
+                           693     
+                           694     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

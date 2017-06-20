@@ -1,0 +1,114 @@
+8086/87/88/186 MACRO ASSEMBLER    CS                                                       12:56:27  11/13/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE CS
+OBJECT MODULE PLACED IN CS.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE CS.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1            NAME  CS
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                    CS                                      ;
+                             5     ;                             INITIALIZES THE PCS                               
+                                                       ;
+                             6     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             7     
+                             8     ; Description:      This program contains the event handler for the 
+                             9     ;                   peripheral chip selects. 
+                            10     ; Table of Contents:
+                            11     ; 1) InitCS: initializes peripheral chip selects on 80188
+                            12     ;
+                            13     ; Revision History:
+                            14     ;      10/30/16  Meera Krishnamoorthy   used functions written by Glen George
+                            15     ;                                       to use for event handling/ timers
+                            16     
+                            17     
+                            18     ; local include files
+                            19 +1  $INCLUDE(CS.INC)
+                      =1    20     ; Chip Select Unit Definitions
+                      =1    21     
+                      =1    22     ; Addresses
+  FFA4                =1    23     PACSreg         EQU     0FFA4H          ;address of PACS register
+  FFA8                =1    24     MPCSreg         EQU     0FFA8H          ;address of MPCS register
+                      =1    25     
+                      =1    26     ; Control Register Values
+  0003                =1    27     PACSval         EQU     00003H          ;PCS base at 0, 3 wait states
+                      =1    28                                             ;0000000000------  starts at address 0
+                      =1    29                                             ;----------000---  reserved
+                      =1    30                                             ;-------------0--  wait for RDY inputs
+                      =1    31                                             ;--------------11  3 wait states
+  0183                =1    32     MPCSval         EQU     00183H          ;PCS in I/O space, use PCS5/6, 3 wait states
+                      =1    33                                             ;0---------000---  reserved
+                      =1    34                                             ;-0000001--------  MCS is 8KB
+                      =1    35                                             ;--------1-------  output PCS5/PCS6
+                      =1    36                                             ;---------0------  PCS in I/O space
+                      =1    37                                             ;-------------0--  wait for RDY inputs
+                      =1    38                                             ;--------------11  3 wait states
+                      =1    39     
+                            40     
+                            41     
+                            42     CGROUP  GROUP   CODE
+                            43     
+----                        44     CODE SEGMENT PUBLIC 'CODE'
+                            45     
+                            46             ASSUME  CS:CGROUP
+                            47     
+                            48     ; InitCS
+                            49     ;
+8086/87/88/186 MACRO ASSEMBLER    CS                                                       12:56:27  11/13/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            50     ; Description:       Initialize the Peripheral Chip Selects on the 80188.
+                            51     ;
+                            52     ; Operation:         Write the initial values to the PACS and MPCS registers.
+                            53     ;
+                            54     ; Arguments:         None.
+                            55     ; Return Value:      None.
+                            56     ;
+                            57     ; Local Variables:   None.
+                            58     ; Shared Variables:  None.
+                            59     ; Global Variables:  None.
+                            60     ;
+                            61     ; Input:             None.
+                            62     ; Output:            None.
+                            63     ;
+                            64     ; Error Handling:    None.
+                            65     ;
+                            66     ; Algorithms:        None.
+                            67     ; Data Structures:   None.
+                            68     ;
+                            69     ; Registers Changed: AX, DX
+                            70     ; Stack Depth:       0 words
+                            71     ;
+                            72     ; Author:            Glen George
+                            73     ; Last Modified:     Oct. 29, 1997
+0000                        74     InitCS  PROC    NEAR
+                            75           PUBLIC      InitCS
+                            76     
+                            77     
+0000 BAA4FF                 78             MOV     DX, PACSreg     ;setup to write to PACS register
+0003 B80300                 79             MOV     AX, PACSval
+0006 EE                     80             OUT     DX, AL          ;write PACSval to PACS (base at 0, 3 wait states)
+                            81     
+0007 BAA8FF                 82             MOV     DX, MPCSreg     ;setup to write to MPCS register
+000A B88301                 83             MOV     AX, MPCSval
+000D EE                     84             OUT     DX, AL          ;write MPCSval to MPCS (I/O space, 3 wait states)
+                            85     
+                            86     
+000E C3                     87             RET                     ;done so return
+                            88     
+                            89     
+                            90     InitCS  ENDP
+                            91     
+                            92     
+----                        93     CODE ENDS
+                            94     
+                            95     
+                            96     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

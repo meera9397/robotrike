@@ -1,0 +1,178 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    19:31:05  12/03/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN9
+OBJECT MODULE PLACED IN MAIN9.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN9.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN9
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                               REMOTE MAIN LOOP                             ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:
+                            11     ;
+                            12     ; Input:            None.
+                            13     ; Output:           None.
+                            14     ;
+                            15     ; User Interface:
+                            16     ; Error Handling:
+                            17     ;
+                            18     ; Algorithms:       None.
+                            19     ; Data Structures:  None.
+                            20     ;
+                            21     ; Known Bugs:       None.
+                            22     ; Limitations:
+                            23     ;
+                            24     ; Revision History:
+                            25     ;
+                            26     
+                            27     ;definitions
+                            28     
+                            29     CGROUP  GROUP   CODE
+                            30     DGROUP  GROUP   DATA
+                            31          
+----                        32     CODE    SEGMENT PUBLIC 'CODE'
+                            33                     ASSUME  CS:CGROUP, DS:DGROUP
+                            34     
+                            35     
+                            36 +1  $INCLUDE(MAIN9.inc)
+                      =1    37     
+                      =1    38     
+                      =1    39     
+  007B                =1    40     CRITICAL_FLAG       EQU 123
+  0045                =1    41     ASCII_E             EQU 69
+  000D                =1    42     CARRIAGE_RETURN     EQU 13
+  0000                =1    43     ASCII_NULL          EQU 0
+  000F                =1    44     MAX_KEY_PRESS       EQU 15
+  0064                =1    45     DISPLAY_LEN         EQU 100
+  0005                =1    46     badkey_len          EQU 5
+  0002                =1    47     off_len             EQU 2
+  0001                =1    48     on_len              EQU 1
+                            49      
+                            50     ;external function declarations
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    19:31:05  12/03/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+                            52             EXTRN   InitCS:NEAR
+                            53             EXTRN   ClrIRQVectors:NEAR
+                            54             EXTRN   InitTimer:NEAR
+                            55             EXTRN   InitEventQueue:NEAR
+                            56             EXTRN   InitDisplay:NEAR
+                            57             EXTRN   InitKeypad:NEAR
+                            58             EXTRN   InitSerial:NEAR
+                            59             EXTRN   InstallKeypadDisplayHandler:NEAR
+                            60             EXTRN   InstallSerialHandler:NEAR
+                            61             EXTRN   EventQueueFull:NEAR
+                            62             EXTRN   DequeueEvent:NEAR
+                            63             
+                            64             EXTRN   GetKeyPress:NEAR
+                            65             EXTRN   GetError:NEAR
+                            66             EXTRN   GetReceivedData:NEAR
+                            67             EXTRN   CheckCriticalFlag:NEAR
+                            68     
+0000                        69     START:
+                            70     
+0000                        71     MAIN:
+0000 FA                     72             CLI
+0001 B8----         R       73             MOV     AX, STACK               ;initialize the stack pointer
+0004 8ED0                   74             MOV     SS, AX
+0006 BCE00190       R       75             MOV     SP, OFFSET(TopOfStack)
+                            76     
+000A B8----         R       77             MOV     AX, DGROUP                ;initialize the data segment
+000D 8ED8                   78             MOV     DS, AX
+000F                        79     StartMainLoop:
+                            80             ; create function to initialize buffer
+000F E80000         E       81             CALL InitCS
+0012 E80000         E       82             CALL ClrIRQVectors
+0015 E80000         E       83             CALL InitTimer
+0018 E80000         E       84             CALL InitEventQueue ; creates event queue
+001B E80000         E       85             CALL InitDisplay
+001E E80000         E       86             CALL InitKeypad
+0021 E80000         E       87             CALL InitSerial
+0024 E80000         E       88             CALL InstallKeypadDisplayHandler
+0027 E80000         E       89             CALL InstallSerialHandler ; written already, installs serial
+                            90                                       ; event handler
+002A                        91         CheckRestart:
+002A E80000         E       92             CALL CheckCriticalFlag
+002D 3D7B00                 93             CMP AX, CRITICAL_FLAG
+0030 7502                   94             JNE GetNewElement
+0032                        95         Restart:
+0032 EBDB                   96             JMP StartMainLoop ; reinitializes everything
+0034                        97         GetNewElement:
+0034 E80000         E       98             CALL DequeueEvent
+0037 BB0000                 99             MOV BX, 0 ; clear upper byte of BX (used to index remote table)
+003A 86DC                  100             XCHG BL, AH ; moves the event type into BL so that it can index table
+                           101                         ; also now high bit of AH is cleared so AL (event value)
+                           102                         ; which is only necessary information is the only thing
+                           103                         ; remaining
+003C 8D360000       R      104             LEA SI, stringbuffer
+0040 2EFF974700     R      105             CALL CS:RemoteTable[BX]
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    19:31:05  12/03/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0045                       106         EndMain:
+0045 EBE3                  107             JMP CheckRestart
+                           108     
+                           109     
+                           110     ; RemoteTable
+                           111     ;
+                           112     ; Description:
+                           113     ;
+                           114     ;
+                           115     ; Notes:            READ ONLY tables should always be in the code segment so
+                           116     ;                   that in a standalone system it will be located in the
+                           117     ;                   ROM with the code.
+                           118     ;
+                           119     ; Author:           Meera Krishnamoorthy
+                           120     ; Last Modified:    11/12/16
+                           121     
+0047                       122     RemoteTable       LABEL   WORD
+                           123             PUBLIC  RemoteTable
+                           124     
+0047 0000           E      125     DW          offset(GetKeyPress)
+0049 0000           E      126     DW          offset(GetError)
+004B 0000           E      127     DW          offset(GetReceivedData)
+                           128     
+----                       129     CODE ENDS
+                           130     
+                           131     
+                           132     ;the data segment. initialized because used later on. 
+                           133     
+----                       134     DATA    SEGMENT PUBLIC  'DATA'
+                           135        
+0000 ??                    136     stringbuffer    DB ?    
+                           137     
+----                       138     DATA    ENDS
+                           139     
+                           140     
+                           141     ;the stack
+                           142     
+----                       143     STACK   SEGMENT STACK  'STACK'
+                           144     
+0000 (80                   145                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                           146     
+01E0                       147     TopOfStack      LABEL   WORD
+                           148     
+----                       149     STACK   ENDS
+                           150     
+                           151     
+                           152     
+                           153     
+                           154     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

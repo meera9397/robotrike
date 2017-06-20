@@ -1,0 +1,45 @@
+; Function Name: SetSerialValue
+; Description: This function sets the necessary bits in the line control
+; register (it OR's the current value of the line control register
+; with what is stored in AL.)
+;
+; Operational Description: This function does this by getting the current
+; value of the line control register and storing that with what is in AL.
+;
+; Arguments: AL: register that stores the thing to be added to the
+;            line control register
+; Return Values: None.
+; Global Variables: None.
+; Shared Variables:
+; Local Variables: None.
+;
+; Inputs: AL: value to or to line control register
+; Outputs: None.
+; User Interface: None.
+; Error Handling: None.
+; Algorithms: None.
+;
+; Data Structures: None.
+; Known Bugs: None.
+;
+; Registers Changed: AX, BX, DX
+; Stack Depth: None.
+; Limitations: Divisor must be a value that exists on the table.
+;
+; Author: Meera Krishnamoorthy
+; Last Modified: 11/18/16
+;
+
+SetSerialValue     PROC        NEAR
+        PUBLIC      SetSerialValue
+
+MOV DX, SERIAL_LCR  ; set the address of DX to the LCR
+PUSH AX ; stores value we want to or to the line control register
+IN AL, DX ; gets current value stored in line control register
+MOV BL, AL ; moves that value to BL
+PUSH AX ; gets value we want to or to line control register
+OR AL, BL ; adds those bits to the current bits in AL
+OUT DX, AL; stores this new value in the line control register
+RET
+
+SetSerialValue	ENDP

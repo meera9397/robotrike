@@ -1,0 +1,969 @@
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW2TEST
+OBJECT MODULE PLACED IN HW2TEST.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE HW2TEST.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    HW2TEST
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   HW2TEST                                  ;
+                             6     ;                            Homework #2 Test Code                           ;
+                             7     ;                                  EE/CS  51                                 ;
+                             8     ;                                                                            ;
+                             9     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            10     
+                            11     ; Description:      This program tests the conversion functions for Homework
+                            12     ;                   #2.  It calls each conversion function with a number of
+                            13     ;                   test values.  If all tests pass it jumps to the label
+                            14     ;                   AllTestsGood.  If any test fails it jumps to the label
+                            15     ;                   TestFailed.
+                            16     ;
+                            17     ; Input:            None.
+                            18     ; Output:           None.
+                            19     ;
+                            20     ; User Interface:   No real user interface.  The user can set breakpoints at
+                            21     ;                   AllTestsGood and TestFailed to see if the code is working
+                            22     ;                   or not.
+                            23     ; Error Handling:   If a test fails the program jumps to TestFailed.
+                            24     ;
+                            25     ; Algorithms:       None.
+                            26     ; Data Structures:  None.
+                            27     ;
+                            28     ; Known Bugs:       None.
+                            29     ; Limitations:      The returned strings must be less than MAX_STRING_SIZE
+                            30     ;                   characters.
+                            31     ;
+                            32     ; Revision History:
+                            33     ;    1/24/06  Glen George               initial revision
+                            34     ;    1/26/06  Glen George               fixed a minor bug
+                            35     ;                                       allow lowercase hex digits
+                            36     ;                                       removed DUPs
+                            37     ;    1/22/07  Glen George               updated comments
+                            38     ;    9/29/10  Glen George               updated comments to indicate it is now
+                            39     ;                                          for Homework #2
+                            40     
+                            41     
+                            42     
+                            43     ;definitions
+                            44     
+  0014                      45     MAX_STRING_SIZE EQU     20              ;maximum string buffer size
+  0000                      46     ASCII_NULL      EQU     0               ;string termination character (<null>)
+                            47     
+                            48     
+                            49     
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     CGROUP  GROUP   CODE
+                            52     DGROUP  GROUP   DATA, STACK
+                            53     
+                            54     
+                            55     
+----                        56     CODE    SEGMENT PUBLIC 'CODE'
+                            57     
+                            58     
+                            59             ASSUME  CS:CGROUP, DS:DGROUP
+                            60     
+                            61     
+                            62     
+                            63     ;external function declarations
+                            64     
+                            65             EXTRN   Dec2String:NEAR         ;convert a number to a decimal string
+                            66             EXTRN   Hex2String:NEAR         ;convert a number to a hex string
+                            67     
+                            68     
+                            69     
+                            70     
+0000                        71     START:  
+                            72     
+0000                        73     MAIN:
+0000 B8----         R       74             MOV     AX, DGROUP              ;initialize the stack pointer
+0003 8ED0                   75             MOV     SS, AX
+0005 BCE00190       R       76             MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            77     
+0009 B8----         R       78             MOV     AX, DGROUP              ;initialize the data segment
+000C 8ED8                   79             MOV     DS, AX
+                            80     
+                            81     
+000E E80600                 82             CALL    ConvertTest             ;do the conversion tests
+0011 E302                   83             JCXZ    AllTestsGood            ;go to appropriate infinite loop
+                            84             ;JMP    TestFailed              ;  based on return value
+                            85     
+                            86     
+0013                        87     TestFailed:                             ;a test failed
+0013 EBFE                   88             JMP     TestFailed              ;just sit here until get interrupted
+                            89     
+                            90     
+0015                        91     AllTestsGood:                           ;all tests passed
+0015 EBFE                   92             JMP     AllTestsGood            ;just sit here until get interrupted
+                            93     
+                            94     
+                            95     
+                            96     
+                            97     ; ConvertTest
+                            98     ;
+                            99     ; Description:       This procedure does the conversion tests.  It repeatedly
+                           100     ;                    calls the conversion functions with values from a table
+                           101     ;                    and then checks the results, also against table values.
+                           102     ;                    If there is a failure in a test the function returns with
+                           103     ;                    the failed test number in CX.  If all tests pass the
+                           104     ;                    function returns 0 in CX.
+                           105     ;
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     ; Operation:         The string buffer is first filled with a known pattern.
+                           107     ;                    Next the conversion function is called with a value from
+                           108     ;                    the test table.  After it returns the buffer contents are
+                           109     ;                    checked against the table entry and if it matches, the
+                           110     ;                    next test is done.  Otherwise the code returns with the
+                           111     ;                    number of the test that failed in CX.
+                           112     ;
+                           113     ; Arguments:         None.
+                           114     ; Return Value:      CX - number of the failed test, zero (0) if all tests
+                           115     ;                         passed.
+                           116     ;
+                           117     ; Local Variables:   CX - test number.
+                           118     ; Shared Variables:  StringOut - filled with the converted strings.
+                           119     ; Global Variables:  None.
+                           120     ;
+                           121     ; Input:             None.
+                           122     ; Output:            None.
+                           123     ;
+                           124     ; Error Handling:    If there is an error in the conversion functions the
+                           125     ;                    number of the test that failed is returned in CX.
+                           126     ;
+                           127     ; Algorithms:        None.
+                           128     ; Data Structures:   None.
+                           129     ;
+                           130     ; Registers Changed: flags, AX, BX, CX, DX, DI, SI
+                           131     ; Stack Depth:       unknown
+                           132     ;
+                           133     ; Author:            Glen George
+                           134     ; Last Modified:     Jan. 24, 2006
+                           135     
+0017                       136     ConvertTest     PROC        NEAR
+                           137                     PUBLIC      ConvertTest
+                           138     
+                           139     
+0017                       140     ConvertTestInit:
+                           141     
+0017 B90000                142             MOV     CX, 0                   ;start with the first test
+                           143     
+001A                       144     ConvertTestLoop:                        ;loop doing tests
+                           145     
+001A E81B01                146             CALL    FillBuffer              ;fill the buffer with a known value
+                           147     
+001D BE000090       R      148             MOV     SI, OFFSET(StringOut)   ;get the buffer address for the call
+0021 6BD90E90              149             IMUL    BX, CX, TESTCASE_SIZE   ;get the offset for this test case
+0025 BAFF7F                150             MOV     DX, 07FFFH              ;keep DX non-zero to test DIV issues
+0028 2E8B874801     R      151             MOV     AX, CS:Tests[BX + VALUE];get value for test
+002D 51                    152             PUSH    CX                      ;don't trash the test number
+                           153     
+002E                       154     HexTest:                                ;convert the number to a hex string
+002E E80000         E      155             CALL    Hex2String
+                           156     
+0031 59                    157             POP     CX                      ;get test number back
+0032 E82E00                158             CALL    CheckHexStr             ;check the converted string
+                           159     
+0035 752A                  160             JNZ     ConvertTestFailed       ;if the test failed - done
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161             ;JZ     CheckDecimal            ;otherwise test OK, try decimal next
+                           162     
+0037                       163     CheckDecimal:                           ;check decimal conversion
+                           164     
+0037 E8FE00                165             CALL    FillBuffer              ;fill the buffer with a known value
+                           166     
+003A BE000090       R      167             MOV     SI, OFFSET(StringOut)   ;get the buffer address for the call
+003E 6BD90E90              168             IMUL    BX, CX, TESTCASE_SIZE   ;get the offset for this test case
+0042 BAFF7F                169             MOV     DX, 07FFFH              ;keep DX non-zero to test DIV issues
+0045 2E8B874801     R      170             MOV     AX, CS:Tests[BX + VALUE];get value for test
+004A 51                    171             PUSH    CX                      ;don't trash the test number
+                           172     
+004B                       173     DecimalTest:                            ;convert the number to a decimal string
+004B E80000         E      174             CALL    Dec2String
+                           175     
+004E 59                    176             POP     CX                      ;get test number back
+004F E83300                177             CALL    CheckDecStr             ;check the converted string
+                           178     
+0052 750D                  179             JNZ     ConvertTestFailed       ;if the test failed - done
+                           180             ;JZ     DoNextTest              ;otherwise test OK, try next value
+                           181     
+                           182     
+0054                       183     DoNextTest:                             ;do the next test
+0054 41                    184             INC     CX
+0055 83F90C90              185             CMP     CX, NUM_TESTS           ;check if there are any more tests
+0059 7CBF                  186             JL      ConvertTestLoop         ;have more tests to do - do them
+                           187             ;JGE    ConvertTestPassed       ;else done with tests - everything passed
+                           188     
+                           189     
+005B                       190     ConvertTestPassed:                      ;all conversion tests passed
+005B B90000                191             MOV     CX, 0                   ;so set return value to 0
+005E EB0290                192             JMP     ConvertTestDone         ;and done
+                           193     
+                           194     
+0061                       195     ConvertTestFailed:                      ;the test failed
+0061 41                    196             INC     CX                      ;adjust CX (return value) to 1-based
+                           197             ;JMP    ConvertTestDone         ;  failed test number and done
+                           198     
+                           199     
+0062                       200     ConvertTestDone:                        ;done with the conversion tests
+                           201                                             ;return with the status
+0062 C3                    202             RET
+                           203     
+                           204     
+                           205     ConvertTest     ENDP
+                           206     
+                           207     
+                           208     
+                           209     
+                           210     ; CheckHexStr
+                           211     ;
+                           212     ; Description:       This procedure checks if the hex string in the buffer
+                           213     ;                    matches the expected hex string for this test.  Leading
+                           214     ;                    zeros or spaces are ignored in the hex string.  If the
+                           215     ;                    strings match the zero flag is set.  If they don't match
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     ;                    the zero flag is reset.
+                           217     ;
+                           218     ; Operation:         The procedure first skips all leading spaces then zeros
+                           219     ;                    in the converted string, except the last one.  Then the
+                           220     ;                    remaining characters are checked against the expected
+                           221     ;                    string up to and including the <null> character.  Lastly
+                           222     ;                    the buffer is checked to be sure nothing else was
+                           223     ;                    overwritten (it still has FF's in it).
+                           224     ;
+                           225     ; Arguments:         CX - test number
+                           226     ; Return Value:      ZF - set if the strings match, reset otherwise.
+                           227     ;
+                           228     ; Local Variables:   SI - pointer into the buffer.
+                           229     ;                    DI - pointer into the expected string.
+                           230     ; Shared Variables:  StringOut - checked against the expected string.
+                           231     ; Global Variables:  None.
+                           232     ;
+                           233     ; Input:             None.
+                           234     ; Output:            None.
+                           235     ;
+                           236     ; Error Handling:    None.
+                           237     ;
+                           238     ; Algorithms:        None.
+                           239     ; Data Structures:   None.
+                           240     ;
+                           241     ; Registers Changed: flags, AL, BX, DI, SI
+                           242     ; Stack Depth:       1 word
+                           243     ;
+                           244     ; Author:            Glen George
+                           245     ; Last Modified:     Jan. 26, 2006
+                           246     
+0063                       247     CheckHexStr     PROC        NEAR
+                           248     
+                           249     
+0063                       250     CheckHexStrInit:
+                           251     
+0063 BE0000                252             MOV     SI, 0                   ;start with the first byte of buffer
+0066 6BD90E90              253             IMUL    BX, CX, TESTCASE_SIZE   ;get the test case entry
+006A 8DBF4A01       R      254             LEA     DI, Tests[BX + HEXSTR]  ;get start of hex string into DI for comparis
+                                   ons
+                           255     
+006E                       256     HexSkipLeading:                         ;skip leading spaces and zeros
+006E E85B00                257             CALL    SkipSpaces              ;skip leading spaces
+0071 E86800                258             CALL    SkipZeros               ;skip leading zeros
+                           259     
+0074 83FE14                260             CMP     SI, MAX_STRING_SIZE     ;check if past end of string
+0077 7309                  261             JAE     HexCheckFail            ;nothing must be in buffer - test fails
+                           262             ;JB     HexCheckValue           ;otherwise check value in buffer
+                           263     
+                           264     
+0079                       265     HexCheckValue:                          ;check if buffer value is correct
+0079 E87700                266             CALL    Str2UC                  ;convert string to uppercase
+007C E89900                267             CALL    CheckStr                ;now check the value
+007F EB0390                268             JMP     CheckHexStrDone         ;all done - return with zero flag
+                           269     
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           270     
+0082                       271     HexCheckFail:                           ;test failed
+0082 0CFF                  272             OR      AL, 0FFH                ;reset the zero flag
+                           273             ;JMP    CheckHexStrDone         ;and done
+                           274     
+                           275     
+0084                       276     CheckHexStrDone:                        ;all done - just return with zero flag
+                           277     
+0084 C3                    278             RET
+                           279     
+                           280     
+                           281     CheckHexStr     ENDP
+                           282     
+                           283     
+                           284     
+                           285     
+                           286     ; CheckDecStr
+                           287     ;
+                           288     ; Description:       This procedure checks if the decimal string in the buffer
+                           289     ;                    matches the expected hex string for this test.  Leading
+                           290     ;                    spaces are ignored in the decimal string.  Leading zeros
+                           291     ;                    are ignored either before or after the sign (but not
+                           292     ;                    both).  A single leading positive sign is also ignored.
+                           293     ;                    If the strings match the zero flag is set.  If they don't
+                           294     ;                    match the zero flag is reset.
+                           295     ;
+                           296     ; Operation:         The procedure first skips all leading spaces.  It then
+                           297     ;                    checks for a sign and skips a plus sign or matching minus
+                           298     ;                    sign (if it matches the expected string).  Next it skips
+                           299     ;                    any zeros up to, but not including, the last zero.  Then
+                           300     ;                    the remaining characters are checked against the expected
+                           301     ;                    string up to and including the <null> character.  Lastly
+                           302     ;                    the buffer is checked to be sure nothing else was
+                           303     ;                    overwritten (it still has FF's in it).
+                           304     ;
+                           305     ; Arguments:         CX - test number
+                           306     ; Return Value:      ZF - set if the strings match, reset otherwise.
+                           307     ;
+                           308     ; Local Variables:   SI - pointer into the buffer.
+                           309     ;                    DI - pointer into the expected string.
+                           310     ; Shared Variables:  StringOut - checked against the expected string.
+                           311     ; Global Variables:  None.
+                           312     ;
+                           313     ; Input:             None.
+                           314     ; Output:            None.
+                           315     ;
+                           316     ; Error Handling:    None.
+                           317     ;
+                           318     ; Algorithms:        None.
+                           319     ; Data Structures:   None.
+                           320     ;
+                           321     ; Registers Changed: flags, AL, BX, DI, SI
+                           322     ; Stack Depth:       1 word
+                           323     ;
+                           324     ; Author:            Glen George
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           325     ; Last Modified:     Jan. 24, 2006
+                           326     
+0085                       327     CheckDecStr     PROC        NEAR
+                           328     
+                           329     
+0085                       330     CheckDecStrInit:
+                           331     
+0085 BE0000                332             MOV     SI, 0                   ;start with the first byte of buffer
+0088 6BD90E90              333             IMUL    BX, CX, TESTCASE_SIZE   ;get the test case entry
+008C 8DBF4F01       R      334             LEA     DI, Tests[BX + DECSTR]  ;get start of decimal string into DI for comp
+                                   arisons
+                           335     
+0090                       336     DecSkipLeading:                         ;skip leading spaces and zeros
+0090 E83900                337             CALL    SkipSpaces              ;skip leading spaces
+0093 83FE14                338             CMP     SI, MAX_STRING_SIZE     ;be sure not past end of string
+0096 7331                  339             JAE     DecCheckFail            ;nothing left in buffer - test fails
+                           340     
+0098 80BC00002B     R      341             CMP     StringOut[SI], '+'      ;check for leading positive sign
+009D 7412                  342             JE      DoSkipSign              ;if have it, skip the sign
+009F 80BC00002D     R      343             CMP     StringOut[SI], '-'      ;check for leading minus sign
+00A4 750C                  344             JNE     DecSkipZeros            ;none, so try to skip zeros
+00A6 2E803D2D              345             CMP     BYTE PTR CS:[DI], '-'   ;otherwise see if match the buffer
+00AA 751D                  346             JNE     DecCheckFail            ;doesn't match, test fails
+                           347             ;JE     DoSkipMinusSign         ;otherwise skip the signs
+                           348     
+00AC                       349     DoSkipMinusSign:                        ;skip the sign
+00AC 46                    350             INC     SI                      ;in the buffer
+00AD 47                    351             INC     DI                      ;and the matching string
+00AE EB0290                352             JMP     DecSkipZeros            ;and now can skip zeros
+                           353     
+00B1                       354     DoSkipSign:                             ;skip the leading positive sign
+00B1 46                    355             INC     SI
+                           356             ;JMP    DecSkipZeros            ;and can skip zeros once get '+' sign
+                           357     
+00B2                       358     DecSkipZeros:                           ;skip leading spaces and zeros
+00B2 2E803D2D              359             CMP     BYTE PTR CS:[DI], '-'   ;first be sure not expecting a sign
+00B6 7411                  360             JE      DecCheckFail            ;if we were - didn't get it in the right plac
+                                   e
+00B8 E81100                361             CALL    SkipSpaces              ;otherwise skip spaces then zeros
+00BB E81E00                362             CALL    SkipZeros               ;   after the sign
+00BE 83FE14                363             CMP     SI, MAX_STRING_SIZE     ;be sure not past end of string
+00C1 7306                  364             JAE     DecCheckFail            ;nothing left in buffer - test fails
+                           365             ;JB     DecCheckValue           ;otherwise check the value
+                           366     
+                           367     
+00C3                       368     DecCheckValue:                          ;check if buffer value is correct
+00C3 E85200                369             CALL    CheckStr
+00C6 EB0390                370             JMP     CheckDecStrDone         ;all done - return with zero flag
+                           371     
+                           372     
+00C9                       373     DecCheckFail:                           ;test failed
+00C9 0CFF                  374             OR      AL, 0FFH                ;reset the zero flag
+                           375             ;JMP    CheckDecStrDone         ;and done
+                           376     
+                           377     
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00CB                       378     CheckDecStrDone:                        ;all done - just return with zero flag
+                           379     
+00CB C3                    380             RET
+                           381     
+                           382     
+                           383     CheckDecStr     ENDP
+                           384     
+                           385     
+                           386     
+                           387     
+                           388     ; SkipSpaces
+                           389     ;
+                           390     ; Description:       This procedure skips spaces in the string buffer starting
+                           391     ;                    at the passed location.
+                           392     ;
+                           393     ; Operation:         Skip spaces in the string until the end of the string or
+                           394     ;                    the end of the string buffer is reached.
+                           395     ;
+                           396     ; Arguments:         SI - offset of string in StringOut buffer where skipping
+                           397     ;                         is to start.
+                           398     ; Return Value:      SI - offset in StringOut buffer past skipped spaces or
+                           399     ;                         the buffer length if there is no <null> to end the
+                           400     ;                         string.
+                           401     ;
+                           402     ; Local Variables:   None.
+                           403     ; Shared Variables:  StringOut - read to skip spaces in this buffer.
+                           404     ; Global Variables:  None.
+                           405     ;
+                           406     ; Input:             None.
+                           407     ; Output:            None.
+                           408     ;
+                           409     ; Error Handling:    None.
+                           410     ;
+                           411     ; Algorithms:        None.
+                           412     ; Data Structures:   None.
+                           413     ;
+                           414     ; Registers Changed: flags, SI
+                           415     ; Stack Depth:       0 words
+                           416     ;
+                           417     ; Author:            Glen George
+                           418     ; Last Modified:     Jan. 24, 2006
+                           419     
+00CC                       420     SkipSpaces      PROC        NEAR
+                           421     
+                           422     
+00CC                       423     SkipSpaceLoop:                          ;loop, skipping spaces
+00CC 83FE14                424             CMP     SI, MAX_STRING_SIZE     ;be sure not past end of string
+00CF 730A                  425             JAE     DoneSpaceSkipping       ;nothing left in buffer - return
+                           426     
+00D1 80BC000020     R      427             CMP     StringOut[SI], ' '      ;check for a space
+                           428             ;JE     DoSpaceSkip             ;if have it, skip it
+00D6 7503                  429             JNE     DoneSpaceSkipping       ;otherwise, done with skipping
+                           430     
+00D8                       431     DoSpaceSkip:                            ;skip the space
+00D8 46                    432             INC     SI
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00D9 EBF1                  433             JMP     SkipSpaceLoop           ;and keep looking for more
+                           434     
+                           435     
+00DB                       436     DoneSpaceSkipping:                      ;done skipping spaces
+                           437                                             ;just return with SI skipped past spaces
+00DB C3                    438             RET
+                           439     
+                           440     
+                           441     SkipSpaces      ENDP
+                           442     
+                           443     
+                           444     
+                           445     
+                           446     ; SkipZeros
+                           447     ;
+                           448     ; Description:       This procedure skips zeros in the string buffer starting
+                           449     ;                    at the passed location.  The last zero in the string is
+                           450     ;                    not skipped.
+                           451     ;
+                           452     ; Operation:         Skip zeros until on last zero in the string or the end of
+                           453     ;                    the string or the end of the string buffer is reached.
+                           454     ;
+                           455     ; Arguments:         SI - offset of string in StringOut buffer where skipping
+                           456     ;                         is to start.
+                           457     ; Return Value:      SI - offset in StringOut buffer past skipped zeros or the
+                           458     ;                         buffer length if there is no <null> to end the
+                           459     ;                         string.
+                           460     ;
+                           461     ; Local Variables:   None.
+                           462     ; Shared Variables:  StringOut - read to skip zeros in this buffer.
+                           463     ; Global Variables:  None.
+                           464     ;
+                           465     ; Input:             None.
+                           466     ; Output:            None.
+                           467     ;
+                           468     ; Error Handling:    None.
+                           469     ;
+                           470     ; Algorithms:        None.
+                           471     ; Data Structures:   None.
+                           472     ;
+                           473     ; Registers Changed: flags, SI
+                           474     ; Stack Depth:       0 words
+                           475     ;
+                           476     ; Author:            Glen George
+                           477     ; Last Modified:     Jan. 24, 2006
+                           478     
+00DC                       479     SkipZeros       PROC        NEAR
+                           480     
+                           481     
+00DC                       482     SkipZeroLoop:                           ;loop, skipping zeros
+00DC 80BC010000     R      483             CMP     StringOut[SI + 1], ASCII_NULL  ;never skip last character
+00E1 740F                  484             JE      DoneZeroSkipping
+00E3 83FE14                485             CMP     SI, MAX_STRING_SIZE     ;be sure not past end of string
+00E6 730A                  486             JAE     DoneZeroSkipping        ;nothing left in buffer - return
+                           487     
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+00E8 80BC000030     R      488             CMP     StringOut[SI], '0'      ;check for a zero
+                           489             ;JE     DoZeroSkip              ;if have it, skip it
+00ED 7503                  490             JNE     DoneZeroSkipping        ;otherwise, done with skipping
+                           491     
+00EF                       492     DoZeroSkip:                             ;skip the zero
+00EF 46                    493             INC     SI
+00F0 EBEA                  494             JMP     SkipZeroLoop            ;and keep looking for more
+                           495     
+                           496     
+00F2                       497     DoneZeroSkipping:                       ;done skipping zeros
+                           498                                             ;just return with SI skipped past zeros
+00F2 C3                    499             RET
+                           500     
+                           501     
+                           502     SkipZeros       ENDP
+                           503     
+                           504     
+                           505     
+                           506     
+                           507     ; Str2UC
+                           508     ;
+                           509     ; Description:       This procedure converts the string stored in StringOut
+                           510     ;                    to uppercase.  The conversion is started at the position
+                           511     ;                    indicated by the passed argument.
+                           512     ;
+                           513     ; Operation:         Convert any lowercase characters to uppercase until the
+                           514     ;                    end of the string or the end of the string buffer is
+                           515     ;                    reached.
+                           516     ;
+                           517     ; Arguments:         SI - offset of string in StringOut buffer where the
+                           518     ;                         conversion to uppercase is to start.
+                           519     ; Return Value:      None.
+                           520     ;
+                           521     ; Local Variables:   None.
+                           522     ; Shared Variables:  StringOut - converted to uppercase.
+                           523     ; Global Variables:  None.
+                           524     ;
+                           525     ; Input:             None.
+                           526     ; Output:            None.
+                           527     ;
+                           528     ; Error Handling:    None.
+                           529     ;
+                           530     ; Algorithms:        None.
+                           531     ; Data Structures:   None.
+                           532     ;
+                           533     ; Registers Changed: flags
+                           534     ; Stack Depth:       1 word
+                           535     ;
+                           536     ; Author:            Glen George
+                           537     ; Last Modified:     Jan. 26, 2006
+                           538     
+00F3                       539     Str2UC          PROC        NEAR
+                           540     
+                           541     
+00F3 56                    542             PUSH    SI                      ;don't trash SI
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           543     
+00F4                       544     CvtUCLoop:                              ;loop, converting to uppercase
+00F4 80BC000000     R      545             CMP     StringOut[SI], ASCII_NULL  ;stop at the end of the string
+00F9 741B                  546             JE      DoneUCConversion
+00FB 83FE14                547             CMP     SI, MAX_STRING_SIZE     ;be sure not past end of string
+00FE 7316                  548             JAE     DoneUCConversion        ;nothing left in buffer - return
+                           549     
+0100 80BC000061     R      550             CMP     StringOut[SI], 'a'      ;check for a lowercase character
+0105 720C                  551             JB      DoNextChar              ;if not, just go to the next character
+0107 80BC00007A     R      552             CMP     StringOut[SI], 'z'      ;and check end of lowercase range
+010C 7705                  553             JA      DoNextChar              ;if past, go to the next character
+                           554             ;JBE    HaveLowercase           ;otherwise have a lowercase character
+                           555     
+010E                       556     HaveLowercase:                          ;have lowercase
+010E 80840000E0     R      557             ADD     StringOut[SI], 'A' - 'a';convert to uppercase
+                           558             ;JMP    DoNextChar              ;and move to next character
+                           559     
+0113                       560     DoNextChar:                             ;move to the next character
+0113 46                    561             INC     SI
+0114 EBDE                  562             JMP     CvtUCLoop               ;and keep converting
+                           563     
+                           564     
+0116                       565     DoneUCConversion:                       ;done converting to uppercase
+                           566                                             ;restore SI and return
+0116 5E                    567             POP     SI
+0117 C3                    568             RET
+                           569     
+                           570     
+                           571     Str2UC          ENDP
+                           572     
+                           573     
+                           574     
+                           575     
+                           576     ; CheckStr
+                           577     ;
+                           578     ; Description:       This procedure checks if the rest of the string in the
+                           579     ;                    buffer matches the expected string for this test.  If the
+                           580     ;                    strings match the zero flag is set.  If they don't match
+                           581     ;                    the zero flag is reset.  It is also verified that the
+                           582     ;                    buffer has not been written over by checking the rest of
+                           583     ;                    it for FF.
+                           584     ;
+                           585     ; Operation:         The procedure checks the buffer characters against the
+                           586     ;                    expected string up to and including the <null> character.
+                           587     ;                    Next the rest of the buffer is checked to be sure nothing
+                           588     ;                    else was overwritten (it still has FF's in it).
+                           589     ;
+                           590     ; Arguments:         SI - pointer into the StringOut buffer to be checked.
+                           591     ;                    CS:DI - pointer to the expected string.
+                           592     ; Return Value:      ZF - set if the strings match, reset otherwise.
+                           593     ;
+                           594     ; Local Variables:   None.
+                           595     ; Shared Variables:  StringOut - checked against the expected string.
+                           596     ; Global Variables:  None.
+                           597     ;
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           598     ; Input:             None.
+                           599     ; Output:            None.
+                           600     ;
+                           601     ; Error Handling:    None.
+                           602     ;
+                           603     ; Algorithms:        None.
+                           604     ; Data Structures:   None.
+                           605     ;
+                           606     ; Registers Changed: flags, AL, SI, DI
+                           607     ; Stack Depth:       0 words
+                           608     ;
+                           609     ; Author:            Glen George
+                           610     ; Last Modified:     Jan. 24, 2006
+                           611     
+0118                       612     CheckStr        PROC        NEAR
+                           613     
+                           614     
+0118                       615     StrCheckLoop:                           ;check if buffer is correct
+0118 8A840000       R      616             MOV     AL, StringOut[SI]       ;get a byte from buffer
+011C 2E3A05                617             CMP     AL, CS:[DI]             ;compare with expected value
+011F 7516                  618             JNE     StrCheckFail            ;didn't match - test fails
+0121 46                    619             INC     SI                      ;else move to next character
+0122 47                    620             INC     DI
+0123 3C00                  621             CMP     AL, ASCII_NULL          ;was it a <null> that was just checked
+0125 75F1                  622             JNE     StrCheckLoop            ;if not keep checking
+                           623             ;JE     StrCheckFF              ;otherwise done comparing strings
+                           624     
+                           625     
+0127                       626     StrCheckFF:                             ;now check if rest of buffer is unaffected
+0127 83FE14                627             CMP     SI, MAX_STRING_SIZE     ;check if at end of buffer
+012A 740B                  628             JE      DoneStrCheckFF          ;if so - done with this check
+012C 80BC0000FF90   R      629             CMP     StringOut[SI], 0FFH     ;otherwise check for buffer still FF
+0132 7503                  630             JNE     StrCheckFail            ;if not FF, check fails - overwrote buffer
+0134 46                    631             INC     SI                      ;otherwise go to next buffer byte
+0135 EBF0                  632             JMP     StrCheckFF              ;and keep checking
+                           633     
+0137                       634     DoneStrCheckFF:                         ;done checking for FF in rest of buffer
+                           635                                             ;this means all is well
+                           636             ;JMP    CheckStrDone            ;zero flag is already set - return
+                           637     
+                           638     
+0137                       639     StrCheckFail:                           ;test failed (zero flag is reset) 
+                           640             ;JMP    CheckStrDone            ;all done - return
+                           641     
+                           642     
+0137                       643     CheckStrDone:                           ;all done - just return with zero flag
+                           644     
+0137 C3                    645             RET
+                           646     
+                           647     
+                           648     CheckStr        ENDP
+                           649     
+                           650     
+                           651     
+                           652     
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           653     ; FillBuffer
+                           654     ;
+                           655     ; Description:       This procedure fills the test buffer with the value FF.
+                           656     ;
+                           657     ; Operation:         The procedure loops, filling the test buffer byte by byte
+                           658     ;                    with the value FF.
+                           659     ;
+                           660     ; Arguments:         None.
+                           661     ; Return Value:      None.
+                           662     ;
+                           663     ; Local Variables:   SI - pointer into the buffer.
+                           664     ; Shared Variables:  StringOut - filled with FF.
+                           665     ; Global Variables:  None.
+                           666     ;
+                           667     ; Input:             None.
+                           668     ; Output:            None.
+                           669     ;
+                           670     ; Error Handling:    None.
+                           671     ;
+                           672     ; Algorithms:        None.
+                           673     ; Data Structures:   None.
+                           674     ;
+                           675     ; Registers Changed: flags, SI
+                           676     ; Stack Depth:       0 words
+                           677     ;
+                           678     ; Author:            Glen George
+                           679     ; Last Modified:     Jan. 24, 2006
+                           680     
+0138                       681     FillBuffer      PROC        NEAR
+                           682     
+                           683     
+0138                       684     FillBufferInit:
+                           685     
+0138 BE0000                686             MOV     SI, 0                   ;start with the first byte
+                           687     
+013B                       688     FillLoop:                               ;loop filling the buffer
+013B C6840000FF90   R      689             MOV     StringOut[SI], 0FFH     ;fill buffer with FF
+0141 46                    690             INC     SI                      ;go to next location
+0142 83FE14                691             CMP     SI, MAX_STRING_SIZE     ;has whole buffer been filled ?
+0145 72F4                  692             JB      FillLoop                ;if not, keep looping
+                           693             ;JAE    FillBufferDone          ;otherwise all done filling buffer
+                           694     
+                           695     
+0147                       696     FillBufferDone:                         ;done filling buffer, return
+                           697     
+0147 C3                    698             RET
+                           699     
+                           700     
+                           701     FillBuffer      ENDP
+                           702     
+                           703     
+                           704     
+                           705     
+                           706     ; Tests
+                           707     ;
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   14
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           708     ; Description:      This is the table of tests for the conversion functions.
+                           709     ;                   Each entry is the value and the string expected from the
+                           710     ;                   hexadecimal conversion and the decimal conversion.  Note
+                           711     ;                   that leading zeros and positive signs are not included as
+                           712     ;                   those are optional in the implementation.
+                           713     ;
+                           714     ; Author:           Glen George
+                           715     ; Last Modified:    Jan. 26, 2006
+                           716     
+0148                       717     Tests   LABEL   WORD
+                           718     
+  0000                     719     VALUE   EQU     $ - Tests               ;offset of value within entry
+                           720     
+0148 0000                  721             DW      0                       ;value to test
+                           722     
+  0002                     723     HEXSTR  EQU     $ - Tests               ;offset of expected hex string
+                           724     
+014A 30                    725             DB      '0', ASCII_NULL         ;expected hex string
+014B 00
+014C FF                    726             DB      0FFH, 0FFH, 0FFH        ;padding to get to fixed length
+014D FF
+014E FF
+                           727     
+  0007                     728     DECSTR  EQU     $ - Tests               ;offset of expected decimal string
+                           729     
+014F 30                    730             DB      '0', ASCII_NULL         ;expected decimal string
+0150 00
+0151 FF                    731             DB      0FFH, 0FFH, 0FFH, 0FFH, 0FFH  ;padding to get to fixed length
+0152 FF
+0153 FF
+0154 FF
+0155 FF
+                           732     
+  000E                     733     TESTCASE_SIZE   EQU     $ - Tests       ;size of a test case
+                           734     
+0156 FFFF                  735             DW      0FFFFH                  ;test #2
+0158 46464646              736             DB      'FFFF', ASCII_NULL
+015C 00
+015D 2D31                  737             DB      '-1', ASCII_NULL, 0FFH, 0FFH, 0FFH, 0FFH
+015F 00
+0160 FF
+0161 FF
+0162 FF
+0163 FF
+                           738     
+0164 0F27                  739             DW      9999                    ;test #3
+0166 32373046              740             DB      '270F', ASCII_NULL
+016A 00
+016B 39393939              741             DB      '9999', ASCII_NULL, 0FFH, 0FFH
+016F 00
+0170 FF
+0171 FF
+                           742     
+0172 1027                  743             DW      10000                   ;test #4
+0174 32373130              744             DB      '2710', ASCII_NULL
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   15
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0178 00
+0179 3130303030            745             DB      '10000', ASCII_NULL, 0FFH
+017E 00
+017F FF
+                           746     
+0180 FF7F                  747             DW      32767                   ;test #5
+0182 37464646              748             DB      '7FFF', ASCII_NULL
+0186 00
+0187 3332373637            749             DB      '32767', ASCII_NULL, 0FFH
+018C 00
+018D FF
+                           750     
+018E F1D8                  751             DW      -9999                   ;test #6
+0190 44384631              752             DB      'D8F1', ASCII_NULL
+0194 00
+0195 2D39393939            753             DB      '-9999', ASCII_NULL, 0FFH
+019A 00
+019B FF
+                           754     
+019C F0D8                  755             DW      -10000                  ;test #7
+019E 44384630              756             DB      'D8F0', ASCII_NULL
+01A2 00
+01A3 2D3130303030          757             DB      '-10000', ASCII_NULL
+01A9 00
+                           758     
+01AA 0080                  759             DW      -32768                  ;test #8
+01AC 38303030              760             DB      '8000', ASCII_NULL
+01B0 00
+01B1 2D3332373638          761             DB      '-32768', ASCII_NULL
+01B7 00
+                           762     
+01B8 BC9A                  763             DW      9ABCH                   ;test #9
+01BA 39414243              764             DB      '9ABC', ASCII_NULL
+01BE 00
+01BF 2D3235393234          765             DB      '-25924', ASCII_NULL
+01C5 00
+                           766     
+01C6 0E00                  767             DW      14                      ;test #10
+01C8 45                    768             DB      'E', ASCII_NULL, 0FFH, 0FFH, 0FFH
+01C9 00
+01CA FF
+01CB FF
+01CC FF
+01CD 3134                  769             DB      '14', ASCII_NULL, 0FFH, 0FFH, 0FFH, 0FFH
+01CF 00
+01D0 FF
+01D1 FF
+01D2 FF
+01D3 FF
+                           770     
+01D4 0100                  771             DW      1                       ;test #11
+01D6 31                    772             DB      '1', ASCII_NULL, 0FFH, 0FFH, 0FFH
+01D7 00
+01D8 FF
+01D9 FF
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   16
+
+
+LOC  OBJ                  LINE     SOURCE
+
+01DA FF
+01DB 31                    773             DB      '1', ASCII_NULL, 0FFH, 0FFH, 0FFH, 0FFH, 0FFH
+01DC 00
+01DD FF
+01DE FF
+01DF FF
+01E0 FF
+01E1 FF
+                           774     
+01E2 010A                  775             DW      2561                    ;test #12
+01E4 413031                776             DB      'A01', ASCII_NULL, 0FFH
+01E7 00
+01E8 FF
+01E9 32353631              777             DB      '2561', ASCII_NULL, 0FFH, 0FFH
+01ED 00
+01EE FF
+01EF FF
+                           778     
+                           779     
+  000C                     780     NUM_TESTS       EQU     ($ - Tests) / TESTCASE_SIZE
+                           781     
+                           782     
+----                       783     CODE    ENDS
+                           784     
+                           785     
+                           786     
+                           787     
+                           788     ;the data segment
+                           789     
+----                       790     DATA    SEGMENT PUBLIC  'DATA'
+                           791     
+                           792     
+0000 (20                   793     StringOut       DB      MAX_STRING_SIZE  DUP (?) ;buffer for converted strings
+     ??
+     )
+                           794     
+                           795     
+----                       796     DATA    ENDS
+                           797     
+                           798     
+                           799     
+                           800     
+                           801     ;the stack
+                           802     
+----                       803     STACK   SEGMENT STACK  'STACK'
+                           804     
+0000 (80                   805                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                           806     
+01E0                       807     TopOfStack      LABEL   WORD
+                           808     
+----                       809     STACK   ENDS
+                           810     
+                           811     
+8086/87/88/186 MACRO ASSEMBLER    HW2TEST                                                  12:37:33  10/16/;6  PAGE   17
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           812     
+                           813             END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

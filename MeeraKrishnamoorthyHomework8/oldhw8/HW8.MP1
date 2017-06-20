@@ -1,0 +1,23 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: PARSER.OBJ, PHELP.OBJ, MAIN.OBJ, HW8TEST.OBJ
+OUTPUT FILE: HW8.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  11/25/;6  TIME:  19:17:34
+
+
+LINK MAP OF MODULE PARSER
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 189CH ------    G    CODE            CODE                          
+ 007EH ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+PARSER.OBJ(PARSER)
+PHELP.OBJ(PHELP)
+MAIN.OBJ(MAIN)
+HW8TEST.OBJ(HW8TEST)

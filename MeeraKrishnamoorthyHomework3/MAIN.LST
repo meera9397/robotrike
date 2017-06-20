@@ -1,0 +1,169 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     10:01:33  12/04/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN
+OBJECT MODULE PLACED IN MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                   HW3TEST                                  ;
+                             5     ;                            Homework #3 Test Code                           ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      This program tests the functions for Homework
+                            11     ;                   #3.  It calls each function in the queue.asm file, and 
+                            12     ;                   then calls "QueueTest" in the hw3.obj file, which
+                            13     ;                   tests the functions in individual cases. It also sets
+                            14     ;                   the size of the queue, creates an instance of the queue
+                            15     ;                   structure, and puts that queue structure at the address in 
+                            16     ;                   the SI register. 
+                            17     ;
+                            18     ; Input:            None.
+                            19     ; Output:           None.
+                            20     ;
+                            21     ; User Interface:   No real user interface.
+                            22     ; Error Handling:   None. 
+                            23     ;
+                            24     ; Algorithms:       None.
+                            25     ; Data Structures:  None.
+                            26     ;
+                            27     ; Known Bugs:       None.
+                            28     ; Limitations:      The returned strings must be less than MAX_STRING_SIZE
+                            29     ;                   characters.
+                            30     ;
+                            31     ; Revision History:
+                            32     ;    10/22/16       Meera Krishnamoorthy    created file based on Homework 2
+                            33     ;                                           test code and modified
+                            34     
+                            35     
+                            36     
+                            37     ;definitions
+                            38     
+  0014                      39     MAX_STRING_SIZE EQU     20              ;maximum string buffer size
+  0000                      40     ASCII_NULL      EQU     0               ;string termination character (<null>)
+                            41     
+                            42     
+                            43     
+                            44     
+                            45     CGROUP  GROUP   CODE
+                            46     DGROUP  GROUP   DATA, STACK
+                            47     
+                            48     
+                            49 +1  $ INCLUDE(queues.inc)
+                      =1    50     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     10:01:33  12/04/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;                                  QUEUES.INC                                ;  
+                      =1    52     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    53     
+                      =1    54     ; This file contains constants for the functions needed to initialize and use
+                      =1    55     ; a queue (which are defined in queues.asm)
+                      =1    56     ;
+                      =1    57     ; Revision History:
+                      =1    58     ;    10/22/16  Meera Krishnamoorthy updated constants/ queue structure
+                      =1    59     
+                      =1    60     
+  0201                =1    61     queue_size equ 513 ; this variable describes the size of the queue
+  0002                =1    62     word_len equ 2 ; the size of a word is 2x the size of a bytes
+  0001                =1    63     byte_len equ 1 ; the size of a byte is set to "1"
+                      =1    64     
+                      =1    65     ; The following structure creates a queue with the following attributes:
+                      =1    66     ; 1) len: the total length the queue can be
+                      =1    67     ; 2) element_size: if this variable is 0, the element size is bytes. if this
+                      =1    68     ;                  variable is 1, then the element size is words.
+                      =1    69     ; 3) front: head pointer for queue
+                      =1    70     ; 4) rear: tail pointer for queue
+                      =1    71     ; 5) elements: the array to put all elements of the queue in 
+                      =1    72     ; 
+----                  =1    73     QueueStruct         STRUC
+0000                  =1    74         len             DW      ?
+0002                  =1    75         element_size    DW      ?
+0004                  =1    76         front           DW      ?
+0006                  =1    77         rear            DW      ?
+0008                  =1    78         elements        DB      (queue_size) DUP (?)
+----                  =1    79     QueueStruct ENDS
+                            80     
+----                        81     CODE    SEGMENT PUBLIC 'CODE'
+                            82     
+                            83     
+                            84             ASSUME  CS:CGROUP, DS:DGROUP
+                            85     
+                            86     
+                            87     
+                            88     ;external function declarations
+                            89     
+                            90             EXTRN   QueueTest:NEAR         ;in the hw3 object file
+                            91             EXTRN   QueueInit:NEAR
+                            92             EXTRN   QueueEmpty:NEAR
+                            93             EXTRN   QueueFull:NEAR
+                            94             EXTRN   Dequeue:NEAR
+                            95             EXTRN   Enqueue:NEAR
+                            96     
+                            97     
+0000                        98     START:  
+                            99     
+0000                       100     MAIN:
+0000 B8----         R      101             MOV     AX, DGROUP              ;initialize the stack pointer
+0003 8ED0                  102             MOV     SS, AX
+0005 BCE00190       R      103             MOV     SP, OFFSET(DGROUP:TopOfStack)
+                           104     
+0009 B8----         R      105             MOV     AX, DGROUP              ;initialize the data segment
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     10:01:33  12/04/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+000C 8ED8                  106             MOV     DS, AX
+                           107     
+000E B90102                108             MOV     CX, queue_size          ; sets the size of the queue
+0011 8D360000       R      109             LEA     SI, queue               ; moves the queue address into SI
+0015 83E901                110             SUB     CX, 1
+0018 E80000         E      111             CALL    QueueTest             ;do the tests on the queue
+                           112            
+                           113     
+----                       114     CODE ENDS
+                           115     
+                           116     ;the data segment
+                           117     
+----                       118     DATA    SEGMENT PUBLIC  'DATA'
+                           119     
+0000 ????                  120     queue QueueStruct <>        ; creates an instance of the queue structure
+0002 ????
+0004 ????
+0006 ????
+0008 (513
+     ??
+     )
+                           121     
+----                       122     DATA    ENDS
+                           123     
+                           124     
+                           125     
+                           126     
+                           127     ;the stack
+                           128     
+----                       129     STACK   SEGMENT STACK  'STACK'
+                           130     
+0000 (80                   131                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                           132     
+01E0                       133     TopOfStack      LABEL   WORD
+                           134     
+----                       135     STACK   ENDS
+                           136     
+                           137     
+                           138     
+                           139     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

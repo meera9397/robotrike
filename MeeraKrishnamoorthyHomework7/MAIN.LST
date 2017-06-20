@@ -1,0 +1,130 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     14:13:29  12/04/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN
+OBJECT MODULE PLACED IN MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                 MAIN LOOP                                  ;
+                             5     ;                       Used to test Homework 7 (Serial )                    ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      This is the main loop used to execute serial code.
+                            11     ;                                       It calls the initialization functions for the
+                            12     ;                   serial port. Once the event handler and interrupts are
+                            13     ;                   set up, this function can run infinitely. Serial data
+                            14     ;                                       is displayed on a serial capture program
+                            15     ; Input:            None.
+                            16     ; Output:           to serial capture program
+                            17     ;
+                            18     ; Error Handling:   None. 
+                            19     ;
+                            20     ; Algorithms:       None.
+                            21     ; Data Structures:  None.
+                            22     ;
+                            23     ; Known Bugs:       None.
+                            24     ; Limitations:      None.
+                            25     ;
+                            26     ; Revision History:
+                            27     ;    11/18/16       Meera Krishnamoorthy    created file based on Homework 2
+                            28     ;                                           test code and modified
+                            29     
+                            30     
+                            31     
+                            32     ;definitions
+                            33     
+                            34     CGROUP  GROUP   CODE
+                            35     DGROUP  GROUP   DATA
+                            36          
+----                        37     CODE    SEGMENT PUBLIC 'CODE'
+                            38                     ASSUME  CS:CGROUP, DS:DGROUP
+                            39                     
+                            40                     
+                            41             EXTRN   InitCS:NEAR
+                            42             EXTRN   ClrIRQVectors:NEAR
+                            43             EXTRN   Install_Serial_Handler:NEAR
+                            44             EXTRN   InitINT2:NEAR
+                            45             EXTRN   InitSerial:NEAR
+                            46                     EXTRN   SerialIOTest:NEAR
+                            47     
+                            48             
+                            49     ;external function declarations
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     14:13:29  12/04/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+0000                        52     START:  
+                            53     
+0000                        54     MAIN:
+0000 FA                     55             CLI
+0001 B8----         R       56             MOV     AX, STACK               ;initialize the stack pointer
+0004 8ED0                   57             MOV     SS, AX
+0006 BCE00190       R       58             MOV     SP, OFFSET(TopOfStack)
+                            59     
+000A B8----         R       60             MOV     AX, DGROUP                ;initialize the data segment
+000D 8ED8                   61             MOV     DS, AX
+                            62     
+000F E80000         E       63             CALL    InitCS                  ;initialize the 80188 chip selects
+                            64                                             ;assumes LCS and UCS already setup
+                            65     
+0012 E80000         E       66             CALL    ClrIRQVectors           ;clear (initialize) interrupt vector table
+                            67     
+                            68                                             
+0015 E80000         E       69             Call    InitSerial              ;initialize the variables for the int2 
+                            70                                             ;event handler
+                            71                                             
+0018 E80000         E       72             CALL    Install_Serial_Handler  ;install the event handler
+                            73                                             ;   ALWAYS install handlers before
+                            74                                             ;   allowing the hardware to interrupt.
+                            75     
+001B E80000         E       76             CALL    InitINT2                ;initialize interrupts via int2
+001E FB                     77             STI                             ;and finally allow interrupts.
+001F E80000         E       78                     Call    SerialIOTest           ; call function to test whether
+                            79                                                                                ; serial c
+                                   ode is working 
+0022 EBFE                   80             Forever: JMP    Forever         ;sit in an infinite loop, nothing to
+                            81                                             ;do in the background routine
+0024 F4                     82             HLT                             ;never executed (hopefully)
+                            83     
+----                        84     CODE ENDS
+                            85     ;the data segment. initialized because used later on. 
+                            86     
+----                        87     DATA    SEGMENT PUBLIC  'DATA'
+                            88     
+                            89     
+----                        90     DATA    ENDS
+                            91     
+                            92     
+                            93     ;the stack
+                            94     
+----                        95     STACK   SEGMENT STACK  'STACK'
+                            96     
+0000 (80                    97                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                            98     
+01E0                        99     TopOfStack      LABEL   WORD
+                           100     
+----                       101     STACK   ENDS
+                           102     
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     14:13:29  12/04/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           103     
+                           104     
+                           105     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

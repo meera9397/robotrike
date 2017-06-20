@@ -1,0 +1,347 @@
+8086/87/88/186 MACRO ASSEMBLER    KEYPAD                                                   22:09:43  12/04/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE KEYPAD
+OBJECT MODULE PLACED IN KEYPAD.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE KEYPAD.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    KEYPAD
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   Keypad                                   ;
+                             6     ;                    Functions to determine key presses on board             ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                                                            ;
+                             9     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            10     
+                            11     
+                            12     ; File Description: This file contains all the functions needed to determine
+                            13     ;                   if a key press has been made on the board and what key
+                            14     ;                   was pressed.
+                            15     ;
+                            16     ; Table of Contents:  
+                            17     ; 1) InitKeypad: initializes variables necessary for keypad functions.
+                            18     ; 2) Scan: scans keypad to see if keys are pressed on each row, and if
+                            19     ;          if they are pressed, if a new key or the same key as before was
+                            20     ;          pressed
+                            21     ; 3) Debounce: called if the same key was pressed in the current iteration
+                            22     ;              of the scan function as the last iteration of the scan function.
+                            23     ;              Keeps track of a counter to see how long the key has been
+                            24     ;              pressed. 
+                            25     ; 
+                            26     ; Revision History:
+                            27     ;     1/26/06  Glen George            initial revision
+                            28     ;    11/5/16  Meera Krishnamoorthy    wrote code and debugged
+                            29     
+                            30     
+                            31     
+                            32     CGROUP  GROUP   CODE
+                            33     DGROUP  GROUP   DATA
+                            34     
+----                        35     CODE    SEGMENT PUBLIC 'CODE'
+                            36         EXTRN   EnqueueEvent:NEAR
+                            37         ASSUME  CS:CGROUP, DS:DGROUP
+                            38     
+                            39 +1  $include(keypad.inc)
+                      =1    40     ; KEYPAD.INC
+                      =1    41     ; This file lists the constants used in "keypad.asm", which contains all
+                      =1    42     ; the functions needed to determine if a key press occurred on
+                      =1    43     ; the keypad. 
+                      =1    44     
+  0080                =1    45     INIT_KEYPAD_ADDRESS  EQU 080H   ; the address of the first row of the keypad
+  0003                =1    46     MAX_ROW              EQU 3      ; The number of rows the keypad has (0 - 3)
+  0064                =1    47     MAX_TIME             EQU 100     ; the amount of time a key needs to be pressed
+                      =1    48                                     ; for it to be considered a valid key press
+                      =1    49     
+  0002                =1    50     KEY_EVENT            EQU 2      ; constant describing key event
+8086/87/88/186 MACRO ASSEMBLER    KEYPAD                                                   22:09:43  12/04/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     
+  00F0                =1    52     NO_KEY_PRESS         EQU 0F0H   ; the value passed in from the keypad when
+                      =1    53                                     ; no key in that row is pressed
+                      =1    54                                     
+  03E8                =1    55     INC_MAX_TIME        EQU 1000     ; higher max counter
+                            56     
+                            57     ; InitKeypad
+                            58     ;
+                            59     ; Description: This function initializes the shared variables used to scan and
+                            60     ;              debounce the keypad.
+                            61     ;
+                            62     ; Operation: It sets keyValue to NO_KEY_PRESS. This shared
+                            63     ;            variables describes the current key pressed, 
+                            64     ;            Then, this function sets debounceCounter, 
+                            65     ;            the variable that debounces a key press once it is made, to 
+                            66     ;            MAX_TIME, the maximum amount of time needed for a key to be pressed 
+                            67     ;            before it is considered a valid key press. Finally, it nulls the 
+                            68     ;            value of rowOffset, a variable used to keep track of what row in the
+                            69     ;            keypad is being checked on. 
+                            70     ;
+                            71     ; Arguments: None
+                            72     ; Return Value: None
+                            73     ;
+                            74     ; Local Variables: None.
+                            75     ; Shared Variables: keyValue: current value of key, R and W, size = 8 bits, 
+                            76     ;                             type = byte
+                            77     ;                   debounceCounter: debounces a key once it has been
+                            78     ;                               pressed, R and W, size = 16 bits, type = word
+                            79     ;                   rowOffset: keeps track of row, R and W, size = 16 bits, 
+                            80     ;                               type = word
+                            81     ; Global Variables: None.
+                            82     ;
+                            83     ; Input: None.
+                            84     ; Output: None.
+                            85     ;
+                            86     ; Error Handling: None.
+                            87     ;
+                            88     ; Algorithms: None.
+                            89     ; Data Structures: None. 
+                            90     ;
+                            91     ;
+                            92     ; Registers Changed: None.
+                            93     ; Stack Depth: None.
+                            94     ;
+                            95     ; Limitations: None.
+                            96     ;
+                            97     ; Author: Meera Krishnamoorthy
+                            98     ; Last Modified: 11/5/16
+                            99     ;
+                           100     
+0000                       101     InitKeypad      PROC        NEAR
+                           102             PUBLIC      InitKeypad
+                           103     
+0000 C6060000F090   R      104     MOV keyValue, NO_KEY_PRESS
+0006 C70601006400   R      105     MOV debounceCounter, MAX_TIME
+8086/87/88/186 MACRO ASSEMBLER    KEYPAD                                                   22:09:43  12/04/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+000C C70603000000   R      106     MOV rowOffset, 0
+0012 C3                    107     RET
+                           108     
+                           109     InitKeypad      ENDP
+                           110     
+                           111     ; Scan
+                           112     ;
+                           113     ; Description: This function is called by the timer event handler. It reads
+                           114     ;              in key presses from every row. Depending on the previous
+                           115     ;              key press, the key press is either debounced, or set to the
+                           116     ;              new key value. 
+                           117     
+                           118     ; Operation: This is done by reading in key presses from each row. If there
+                           119     ;            is no key press on a row, the next row is looked at (the
+                           120     ;            rowOffset variable is incremented, and wraps to continuously
+                           121     ;            search the rows). If a key is pressed, only the last 4 bits
+                           122     ;            are looked at (those bits contain the information). Those 4 bits
+                           123     ;            are compared to keyValue, which contains the previously pressed
+                           124     ;            key. If the current press and keyValue are the same, that
+                           125     ;            key value is debounced by calling the debounce method. If the
+                           126     ;            key values are different, keyValue is set to the new pressed
+                           127     ;            key value, and the debounce counter is re-initialized.
+                           128     
+                           129     ; Arguments: None. 
+                           130     ; Return Value:
+                           131     ;
+                           132     ; Local Variables: None.
+                           133     ; Shared Variables: keyValue: current value of key, R and W, size = 8 bits, 
+                           134     ;                             type = byte
+                           135     ;                   debounceCounter: debounces a key once it has been
+                           136     ;                               pressed, R and W, size = 16 bits, type = word
+                           137     ;                   rowOffset: keeps track of row, R and W, size = 16 bits, 
+                           138     ;                               type = word
+                           139     ; Global Variables: None.
+                           140     ;
+                           141     ; Input: Keypad inputs (read in AL)
+                           142     ; Output: None.
+                           143     ;
+                           144     ; Error Handling: None.
+                           145     ;
+                           146     ; Algorithms: None.
+                           147     ; Data Structures: Queues: used to store keypresses, and are stored in 
+                           148     ;                  a buffer. 
+                           149     ;
+                           150     ;
+                           151     ; Registers Changed: AX, DX
+                           152     ; Stack Depth: None.
+                           153     ;
+                           154     ; Limitations: None. 
+                           155     ;
+                           156     ; Author: Meera Krishnamoorthy
+                           157     ; Last Modified: 11/5/16
+                           158     ;
+                           159     
+0013                       160     Scan     PROC        NEAR
+8086/87/88/186 MACRO ASSEMBLER    KEYPAD                                                   22:09:43  12/04/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161             PUBLIC      Scan
+                           162     
+                           163     ; get value of current row in keypad we are looking at
+                           164     
+0013                       165     StartScan:
+                           166         ; set DX equal to the address of the current row being looked at
+0013 BA8000                167         MOV DX, INIT_KEYPAD_ADDRESS
+0016 03160300       R      168         ADD DX, rowOffset
+001A EC                    169         IN AL, DX ; get value of key being pressed in that row
+                           170     
+001B                       171     CheckAL:
+001B C0E004                172         SHL AL, 4 ; only look at the last 4 bits of AL (hold the important 
+                           173                   ; information
+001E 3CF0                  174         CMP AL, NO_KEY_PRESS ; check if a key is being pressed
+0020 7418                  175         JE IncRow ; if no key being pressed, move on to next row
+                           176         ;JNE DetermineDebounce
+                           177     
+0022                       178     DetermineDebounce:
+0022 3A060000       R      179         CMP AL, keyValue ; check if AL is equal to value of key 
+                           180                        ; pressed before this method was called
+0026 740C                  181         JE NeedDebounce ; if value is same, debounce the key
+                           182         ;JNE NewKey ; if value is not same, set new value of keyValue (new key
+                           183                     ; being pressed in that row
+                           184     
+0028                       185     NewKey: ;if new key being pressed
+0028 C70601006400   R      186         MOV debounceCounter, MAX_TIME ; re initialize variable keeping track of 
+                           187                                       ; number of seconds key
+                           188                                       ; has been pressed
+002E A20000         R      189         MOV keyValue, AL ; set keyValue equal to this new pressed key
+0031 EB2690                190         JMP EndScan
+                           191         
+0034                       192     NeedDebounce:
+0034 E82300                193         Call Debounce ;call function to debounce key being pressed
+0037 EB2090                194         JMP EndScan
+                           195         
+003A                       196     IncRow:
+003A C70601006400   R      197         MOV debounceCounter, MAX_TIME ; re initialize variable keeping track of 
+                           198                                       ; number of seconds key
+                           199                                       ; has been pressed because of new key press
+                           200                                       ; (no key press = new key press)
+                           201                                  
+                           202         ; increment the row counter
+0040 8B1E0300       R      203         MOV BX, rowOffset
+0044 43                    204         INC BX
+0045 891E0300       R      205         MOV rowOffset, BX
+0049 833E030003     R      206         CMP rowOffset, MAX_ROW ;account for wrapping with the row counter
+004E 7E09                  207         JLE EndScan
+                           208         ;JGE WrapRow
+                           209     
+0050                       210     WrapRow:
+0050 C70603000000   R      211         MOV rowOffset, 0 
+0056 EB0190                212         JMP EndScan
+                           213                      
+0059                       214     EndScan:
+0059 C3                    215         RET
+8086/87/88/186 MACRO ASSEMBLER    KEYPAD                                                   22:09:43  12/04/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     
+                           217     Scan    ENDP
+                           218     
+                           219     ; Debounce
+                           220     ;
+                           221     ; Description: This function keeps track of how long a key press has been made,
+                           222     ;              to determine the validity of that key press. If a key press
+                           223     ;              has been made for MAX_TIME calls of the debounce function,
+                           224     ;              then it is considered a valid key press, and it is stored in AL.
+                           225     ;              along with a constant describing the type of event it is stored 
+                           226     ;              in AH. Then, the timer will be set to a higher value to account
+                           227     ;              for any constant key presses. 
+                           228     ;
+                           229     ; Operation: This is done by making a shared variable counter that decrements
+                           230     ;            each time the function is called. Once this counter is 0, 
+                           231     ;            the key press is ready to be enqueued. The value of the key
+                           232     ;            press, along with the row of the key press, is stored in AL.
+                           233     ;            A constant describing the key press (KEY_EVENT) is stored in AH.
+                           234     ;            Then, the timer will be set to a higher value to account
+                           235     ;            for any constant key presses. 
+                           236     ; 
+                           237     ; 
+                           238     ; Arguments: None
+                           239     ; Return Value: None
+                           240     ;
+                           241     ; Local Variables: None.
+                           242     ; Shared Variables: keyValue: current value of key, R and W, size = 8 bits, 
+                           243     ;                             type = byte
+                           244     ;                   debounceCounter: debounces a key once it has been
+                           245     ;                               pressed, R and W, size = 16 bits, type = word
+                           246     ;                   rowOffset: keeps track of row, R and W, size = 16 bits, 
+                           247     ;                               type = word
+                           248     ; Global Variables: None.
+                           249     ;
+                           250     ; Input: None.
+                           251     ; Output: None.
+                           252     ;
+                           253     ; Error Handling: None.
+                           254     ;
+                           255     ; Algorithms: None.
+                           256     ; Data Structures: Queues.
+                           257     ;
+                           258     ;
+                           259     ; Registers Changed: None.
+                           260     ; Stack Depth: None.
+                           261     ;
+                           262     ; Limitations: None.
+                           263     ;
+                           264     ; Author: Meera Krishnamoorthy
+                           265     ; Last Modified: 11/5/16
+                           266     ;
+                           267     
+005A                       268     Debounce     PROC        NEAR
+                           269             PUBLIC      Debounce
+                           270     
+8086/87/88/186 MACRO ASSEMBLER    KEYPAD                                                   22:09:43  12/04/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+005A                       271     DecCounter:
+005A FF0E0100       R      272         DEC debounceCounter ; debounce by ensuring that the key press stays
+                           273                             ; the same each time the method is called
+005E 833E010000     R      274         CMP debounceCounter, 0 ; if the debounceCounter is 0, that means
+                           275                                ; the key press has been debounced and can be
+                           276                                ; enqueued
+0063 7F15                  277         JG EndDebounce  
+                           278         
+0065                       279     StoreVal:
+0065 8B1E0300       R      280         MOV BX, rowOffset 
+0069 021E0000       R      281         ADD BL, keyValue  ; add row offset to key value so that we know
+                           282                           ; which row the pressed key was on (keys in 
+                           283                           ; each column have the same value)
+                           284     
+006D 8AC3                  285         MOV AL, BL ; set AL = new key press + row that it was on
+006F B402                  286         MOV AH, KEY_EVENT ; move constant describing type of event into AH
+0071 C7060100E803   R      287         MOV debounceCounter, INC_MAX_TIME ; autorepeat, if get same key 
+                           288                                           ; press again, set timer to 
+                           289                                           ; greater value. 
+0077 E80000         E      290         Call EnqueueEvent ;enqueue the keypress (keep track of it)
+                           291     
+007A                       292     EndDebounce:
+007A C3                    293         RET
+                           294     
+                           295     Debounce        ENDP
+                           296     
+                           297     
+----                       298     CODE    ENDS
+                           299     
+                           300     
+----                       301     DATA    SEGMENT PUBLIC  'DATA'
+                           302     
+0000 ??                    303     keyValue        DB      ?       ;the current value of key press
+0001 ????                  304     debounceCounter DW      ?       ;number of times key has been pressed
+0003 ????                  305     rowOffset       DW      ?       ;current row looking at      
+                           306     
+----                       307     DATA    ENDS
+                           308     
+                           309     
+                           310     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

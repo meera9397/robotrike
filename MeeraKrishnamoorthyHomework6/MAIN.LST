@@ -1,0 +1,109 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     12:56:23  11/13/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN
+OBJECT MODULE PLACED IN MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                 MAIN LOOP                                  ;
+                             5     ;                       Used to test Homework 6 (Motors )                    ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      
+                            11     ;
+                            12     ; Revision History:
+                            13     ;    10/22/16       Meera Krishnamoorthy    created file based on Homework 2
+                            14     ;                                           test code and modified
+                            15     
+                            16     
+                            17     
+                            18     ;definitions
+                            19     
+                            20     CGROUP  GROUP   CODE
+                            21     DGROUP  GROUP   DATA
+                            22          
+----                        23     CODE    SEGMENT PUBLIC 'CODE'
+                            24                     ASSUME  CS:CGROUP, DS:DGROUP
+                            25                     
+                            26                     
+                            27             EXTRN   InitCS:NEAR
+                            28             EXTRN   ClrIRQVectors:NEAR
+                            29             EXTRN   Install_PWM_Handler:NEAR
+                            30             EXTRN   InitTimer:NEAR
+                            31             EXTRN   InitMotor:NEAR
+                            32                     EXTRN   MotorTest:NEAR
+                            33     
+                            34             
+                            35     ;external function declarations
+                            36     
+                            37     
+0000                        38     START:  
+                            39     
+0000                        40     MAIN:
+0000 FA                     41             CLI
+0001 B8----         R       42             MOV     AX, STACK               ;initialize the stack pointer
+0004 8ED0                   43             MOV     SS, AX
+0006 BCE00190       R       44             MOV     SP, OFFSET(TopOfStack)
+                            45     
+000A B8----         R       46             MOV     AX, DGROUP                ;initialize the data segment
+000D 8ED8                   47             MOV     DS, AX
+                            48     
+000F E80000         E       49             CALL    InitCS                  ;initialize the 80188 chip selects
+                            50                                             ;assumes LCS and UCS already setup
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     12:56:23  11/13/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+0012 E80000         E       52             CALL    ClrIRQVectors           ;clear (initialize) interrupt vector table
+                            53     
+                            54                                             
+0015 E80000         E       55             Call    InitMotor              ;initialize the variables for the timer 
+                            56                                             ;event handler
+                            57                                             
+0018 E80000         E       58             CALL    Install_PWM_Handler          ;install the event handler
+                            59                                             ;   ALWAYS install handlers before
+                            60                                             ;   allowing the hardware to interrupt.
+                            61     
+001B E80000         E       62             CALL    InitTimer               ;initialize the internal timer
+001E FB                     63             STI                             ;and finally allow interrupts.
+001F E80000         E       64                     Call    MotorTest
+0022 EBFE                   65             Forever: JMP    Forever         ;sit in an infinite loop, nothing to
+                            66                                             ;do in the background routine
+0024 F4                     67             HLT                             ;never executed (hopefully)
+                            68     
+----                        69     CODE ENDS
+                            70     ;the data segment. initialized because used later on. 
+                            71     
+----                        72     DATA    SEGMENT PUBLIC  'DATA'
+                            73     
+                            74     
+----                        75     DATA    ENDS
+                            76     
+                            77     
+                            78     ;the stack
+                            79     
+----                        80     STACK   SEGMENT STACK  'STACK'
+                            81     
+0000 (80                    82                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                            83     
+01E0                        84     TopOfStack      LABEL   WORD
+                            85     
+----                        86     STACK   ENDS
+                            87     
+                            88     
+                            89     
+                            90     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

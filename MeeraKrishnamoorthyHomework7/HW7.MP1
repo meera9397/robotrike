@@ -1,0 +1,27 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: SERIAL.OBJ, HW7TEST.OBJ, MAIN.OBJ, EH.OBJ, INT2.OBJ, CS.OBJ, 
+  QUEUES.OBJ
+OUTPUT FILE: HW7.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  12/04/;6  TIME:  14:13:33
+
+
+LINK MAP OF MODULE SERIAL
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 0393H ------    G    CODE            CODE                          
+ 0520H ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+SERIAL.OBJ(SERIAL)
+HW7TEST.OBJ(HW7TEST)
+MAIN.OBJ(MAIN)
+EH.OBJ(EH)
+INT2.OBJ(INT2)
+CS.OBJ(CS)
+QUEUES.OBJ(QUEUES)

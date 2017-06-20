@@ -1,0 +1,555 @@
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE DISPLAY
+OBJECT MODULE PLACED IN DISPLAY.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE DISPLAY.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    DISPLAY
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   Display                                  ;
+                             6     ;  Functions to display numbers (in decimal and hexadecimal), and strings    ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                                                            ;
+                             9     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            10     
+                            11     ; WHAT I CHANGED:
+                            12     ; 1) updated Display and MuxSegPatterns to get 14 segment display
+                            13     ; File Description: This file contains some of the functions
+                            14     ;                   necessary to output strings/numbers to an 8 character
+                            15     ;                   display. Specifically, it contains functions that
+                            16     ;                   convert strings/numbers/hexadecimal numbers into
+                            17     ;                   segment patterns, and a function that can output those
+                            18     ;                   segment patterns via muxing to the display.
+                            19     ; Table of Contents
+                            20     ; 1) Display: converts string to segment patterns that can be outputted
+                            21     ;             to the display
+                            22     ; 2) DisplayNum: converts a 15 bit signed number to segment patterns that can be 
+                            23     ;             outputted to the display
+                            24     ; 3) DisplayHex: converts a 16 bit unsigned number to segment patterns that can be 
+                            25     ;             outputted to the display
+                            26     ; 4) InitDisplay: initializes segment buffer and index that points to 
+                            27     ;                   current segment to output to display in buffer
+                            28     ; 5) MuxSegPatterns; outputs segments to display from segment buffer one by one
+                            29     ;                    keeping track of which segments have been outputted in
+                            30     ;                    aforementioned index variable. 
+                            31     ; 
+                            32     ; Revision History:
+                            33     ;    10/29/16  Meera Krishnamoorthy   wrote code and debugged
+                            34     ;    10/30/16  Meera Krishnamoorthy   commented and debugged
+                            35     ;    12/8/16   Meera Krishnamoorthy   updated code to include 14 segment
+                            36     ;                                     display
+                            37     
+                            38     
+                            39     
+                            40     CGROUP  GROUP   CODE
+                            41     DGROUP  GROUP   DATA
+                            42     
+                            43 +1  $INCLUDE(DISPLAY.INC)
+                      =1    44     ; DISPLAY.INC
+                      =1    45     ; This file contains the constants for the functions in "display.asm", three
+                      =1    46     ; of which are used to convert decimal/hexadecimal numbers into segment patterns,
+                      =1    47     ; and two of which are used to display those segment patterns on the board
+                      =1    48     
+                      =1    49     
+                      =1    50     ; Revision History:
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;    10/30/16  Meera Krishnamoorthy wrote constants
+                      =1    52     
+  0000                =1    53     ASCII_NULL      equ 0           ;used to check if the string was terminated
+  0008                =1    54     DISPLAY_LEN     equ 8           ;the number of characters that can be displayed
+                      =1    55                                     ;on the display
+                      =1    56     ; these constants are the same as the ones above, but exist in case the
+                      =1    57     ; LED Display Address changes                                
+  0000                =1    58     LEDDisplay      equ 0000H                       ;display address of initial segment
+  0008                =1    59     LEDHighByteAdd  equ LEDDisplay + DISPLAY_LEN    ;display address of offset segments i
+                                   n
+                      =1    60                                                     ; MuxSegPatterns
+                      =1    61     
+  0010                =1    62     BUFFER_LENGTH equ 16 ; length of buffer storing segments
+                            63 +1  $INCLUDE(simpmac.inc)
+                      =1    64 +1  $NOLIST
+                           436     
+----                       437     CODE    SEGMENT PUBLIC 'CODE'
+                           438            EXTRN   ASCIISegTable:BYTE
+                           439            EXTRN   Dec2String:NEAR
+                           440            EXTRN   Hex2String:NEAR
+                           441            ASSUME  CS:CGROUP, DS:DGROUP
+                           442            ;NO_SEG_PAT equ $ - ASCIISegTable
+                           443            
+                           444     
+                           445     ; Display
+                           446     ;
+                           447     ; Description: This function is passed a string that is null terminated (str) 
+                           448     ;              and updates the buffer in the data segment with segment
+                           449     ;              patterns corresponding to the characters in the string. The
+                           450     ;              null terminated string is passed by reference in ES:SI. ES
+                           451     ;              is used so that the string can be in the code segment (it can
+                           452     ;              be a constant string) without needing to change the data segment.
+                           453     ;              The function converts each character in the string to a segment
+                           454     ;              pattern that represents the character, and saves that segment 
+                           455     ;              pattern so that it can be accessed by a function that writes
+                           456     ;              to the display 
+                           457     ;
+                           458     ; Operation: A string is a sequence of ASCII characters. The way that this 
+                           459     ;            function converts a string to something that can be displayed
+                           460     ;            on the LED display is by converting each ASCII character in
+                           461     ;            that string to a segment pattern. This is done using the 
+                           462     ;            "segtable.asm" file, which contains each ASCII character's 
+                           463     ;            representation as a segment pattern. This segment pattern table is 
+                           464     ;            ordered like an ASCII table so accessing each value in the table
+                           465     ;            would require finding the address that the ASCII character is
+                           466     ;            stored in and incrementing that address by a byte to access
+                           467     ;            each character individually. Then, a segment pattern from
+                           468     ;            each character is saved in an array in the data segment so that
+                           469     ;            it can be used by the event handler when an interrupt is 
+                           470     ;            signalled. This function stops when either the
+                           471     ;            number of characters it has converted to segment patterns
+                           472     ;            is 8 (because there is space for 8 characters on the LED display),
+                           473     ;            or if the it encounters a null character (indicating the end
+                           474     ;            of the string). At the end, the function adds a null character
+                           475     ;            to the buffer.
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           476     ;
+                           477     ; Arguments: str (passed by reference in ad)
+                           478     ; Return Value:
+                           479     ;
+                           480     ; Local Variables: None.
+                           481     ; Shared Variables: segbuffer: used to store the segment pattern array
+                           482     ; Global Variables: None.
+                           483     ;
+                           484     ; Input: None.
+                           485     ; Output: None.
+                           486     ;
+                           487     ; Error Handling: None.
+                           488     ;
+                           489     ; Algorithms: None.
+                           490     ; Data Structures: ASCII Table stored in segtab14.asm. It is the same size
+                           491     ;                  as an ASCII table, and is R only (no writing is done
+                           492     ;                  to the table)
+                           493     ;
+                           494     ;
+                           495     ; Registers Changed: DI, SI, BX, AL
+                           496     ; Stack Depth: None.
+                           497     ;
+                           498     ; Limitations: the display can only display 8 ASCII characters at a time
+                           499     ;
+                           500     ; Author: Meera Krishnamoorthy
+                           501     ; Last Modified: 10/29/16
+                           502     ;
+                           503     
+0000                       504     Display      PROC        NEAR
+                           505             PUBLIC      Display
+0000 60                    506     PUSHA
+0001 BF0000                507     MOV DI, 0 ;initialize index of segment buffer
+                           508               ; keeps track of how many elements have been added to buffer
+                           509               ; truncates the number at 8
+                           510     
+0004                       511     NextChar: 
+0004 83FF10                512         CMP DI, BUFFER_LENGTH ; keeps function looping if the number of items
+                           513                             ; in the buffer is < buffer_length
+0007 742E                  514         JE EndDisplay
+                           515         
+0009                       516     Convert:
+                           517         ;LEA BX, ASCIISegTable
+0009 B400                  518         MOV AH, 0
+000B 268A04                519         MOV AL, byte ptr ES:[SI] ;gets current character from string stored in 
+                           520                                  ; ES:SI to convert to a segment pattern
+000E 3C00                  521         CMP AL, ASCII_NULL ;if the character is null, that means the string
+                           522                            ; has ended. Thus the function can stop converting.
+0010 7419                  523         JE AddNull
+                           524         
+                           525         ;XLAT CS:ASCIISegTable  ; looks up representation of AL in segment pattern table 
+                                         
+0012 D0E0                  526         SHL AL, 1 ; multiply by 2 to index word table (segtab14 is a word table)
+                           527         
+0014 8BD8                  528         MOV BX, AX ; move index into BX (only BX can index tables)
+0016 2E8A870000     E      529         MOV AL, CS:ASCIISegTable[BX] ; move low byte of table element into AL
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           530         
+001B 43                    531         INC BX
+001C 2E8AA70000     E      532         MOV AH, CS:ASCIISegTable[BX] ; move low byte of table element into AH
+                           533         
+0021 89850000       R      534         MOV segbuffer[DI], AX ; stores segment pattern in buffer
+                           535         
+0025 46                    536         INC SI ; increment address of the string we are looking at
+0026 83C702                537         ADD DI, 2 ; add 2 to string buffer because added a word (AH + AL)
+0029 EBD9                  538         JMP NextChar
+                           539         
+002B                       540     AddNull:
+                           541         ; continues to add null characters to the string until the buffer's size
+                           542         ; is DISPLAY_LEN (the length of the display)
+002B C78500000000   R      543         MOV segbuffer[DI], ASCII_NULL
+0031 47                    544         INC DI
+0032 83FF10                545         CMP DI, BUFFER_LENGTH
+0035 7CF4                  546         JL AddNull
+                           547         ;JE EndDisplay
+                           548         
+0037                       549     EndDisplay:
+0037 C78500000000   R      550         MOV segbuffer[DI], ASCII_NULL ; adds null character to end of buffer
+                           551                                       ; indicating string is terminated
+003D 61                    552     POPA                         
+003E C3                    553         RET
+                           554     
+                           555     Display ENDP
+                           556     
+                           557     
+                           558     ; DisplayNum
+                           559     ;
+                           560     ; Description:The function is passed a 16 bit signed value (n). It must output
+                           561     ;             in decimal (at most 4 digits + negative sign) to the LED display.
+                           562     ;             n is passed in AX by value. 
+                           563     ;
+                           564     ; Operation: This is done by first moving the location of the string
+                           565     ;            containing the signed value from the string buffer into SI. The
+                           566     ;            value of SI is saved because Dec2String writes to SI, and increment
+                           567     ;            SI's value to point to the end of the string. Thus, SI's original
+                           568     ;            value is later restored so that SI points to the front
+                           569     ;            of the string. 
+                           570     ;            Then Dec2String is called.
+                           571     ;            It converts a number to an ASCII str9jg by offsetting each
+                           572     ;            digit with the ASCII representation of 0. Then, this function
+                           573     ;            changes from working in the data segment to the extra segment
+                           574     ;            register, because Display converts the string in ES:SI.
+                           575     ;            Finally, this function calls the Display function written above to 
+                           576     ;       convert the string
+                           577     ;            with the signed value to segment patterns that display each 
+                           578     ;            character, saving each segment pattern in the buffer.
+                           579     ;
+                           580     ; Arguments: str(passed by reference in address ES:SI)
+                           581     ; Return Value:
+                           582     ;
+                           583     ; Local Variables: None.
+                           584     ; Shared Variables: segbuffer: used to store the segment pattern array
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           585     ; Global Variables: None.
+                           586     ;
+                           587     ; Input: None.
+                           588     ; Output: None.
+                           589     ;
+                           590     ; Error Handling: None.
+                           591     ;
+                           592     ; Algorithms: None.
+                           593     ; Data Structures: ASCII Table stored in segtable.asm. It is the same size
+                           594     ;                  as an ASCII table, and is R only (no writing is done
+                           595     ;                  to the table)
+                           596     ;
+                           597     ;
+                           598     ; Registers Changed: SI
+                           599     ; Stack Depth: None.
+                           600     ;
+                           601     ; Limitations:
+                           602     ;
+                           603     ; Author: Meera Krishnamoorthy
+                           604     ; Last Modified: 10/29/16
+                           605     ;
+                           606     
+003F                       607     DisplayNum      PROC        NEAR
+                           608             PUBLIC      DisplayNum
+003F 60                    609     PUSHA
+0040 BE200090       R      610     MOV SI, offset(stringbuffer) ; set SI to point at front of string to convert
+                           611                                  ; to seg patterns
+0044 56                    612     PUSH SI ; save the value of SI because it will be changed in Dec2String
+0045 E80000         E      613     Call Dec2String ;convert signed value to ASCII string
+                           614     
+0048 1E                    615     PUSH DS ;Dec2String was working in the data segment, and the Display function
+                           616             ; works in the ES. Thus, we need to exchange DS and ES to work in the
+                           617             ; ES
+0049 07                    618     POP ES
+004A 5E                    619     POP SI ;move SI to point at beginning of string again
+                           620     
+004B E8B2FF                621     Call Display ; convert string to segment patterns to display
+004E 61                    622     POPA
+004F C3                    623     RET
+                           624     
+                           625     DisplayNum      ENDP
+                           626     
+                           627     
+                           628     ; DisplayNum
+                           629     ;
+                           630     ; Description:The function is passed a 16 bit unsigned value (n). It must output
+                           631     ;             in hexadecimal (at most 5 digits) to the LED display.
+                           632     ;             n is passed in AX by value. 
+                           633     ;
+                           634     ; Operation: This is done by first moving the location of the string
+                           635     ;            containing the signed value from the string buffer into SI. The
+                           636     ;            value of SI is saved because SI is the address of the string.
+                           637     ;            Hex2String writes to SI, and increment SI's value to point to the 
+                           638     ;            end of the string. Thus, SI's original value is later restored 
+                           639     ;            so that SI points to the front of the string. 
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           640     ;            Then Hex2String is called.
+                           641     ;            It converts a number to its hexadecimal representation in
+                           642     ;            ASCII by offsetting each digit with the ASCII representation of 0
+                           643     ;            if it is less than 9, or the ASCII representation of A - 10 for
+                           644     ;            numbers greater than or equal to 10 (the "-10" comes from
+                           645     ;            the offset of the digit itself being greater than or equal
+                           646     ;            to 10).
+                           647     ;            Then, this function changes from working in the data segment to the 
+                           648     ;            extra segment register, because Display converts the string in ES:SI.
+                           649     ;            Finally, this function calls the Display function written above to 
+                           650     ;            convert the string with the hexadecimal value to segment patterns
+                           651     ;            that display each character, saving each segment pattern in the 
+                           652     ;            buffer.
+                           653     ;
+                           654     ; Arguments: str(passed by reference in address ES:SI)
+                           655     ; Return Value:
+                           656     ;
+                           657     ; Local Variables: None.
+                           658     ; Shared Variables: segbuffer: used to store the segment pattern array
+                           659     ; Global Variables: None.
+                           660     ;
+                           661     ; Input: None.
+                           662     ; Output: None.
+                           663     ;
+                           664     ; Error Handling: None.
+                           665     ;
+                           666     ; Algorithms: None.
+                           667     ; Data Structures: ASCII Table stored in segtable.asm. It is the same size
+                           668     ;                  as an ASCII table, and is R only (no writing is done
+                           669     ;                  to the table)
+                           670     ;
+                           671     ;
+                           672     ; Registers Changed: SI
+                           673     ; Stack Depth: None.
+                           674     ;
+                           675     ; Limitations:
+                           676     ;
+                           677     ; Author: Meera Krishnamoorthy
+                           678     ; Last Modified: 10/29/16
+                           679     
+0050                       680     DisplayHex      PROC        NEAR
+                           681             PUBLIC      DisplayHex
+0050 60                    682     PUSHA        
+0051 BE200090       R      683     MOV SI, offset(stringbuffer) ; set SI to point at front of string to convert
+                           684                                  ; to seg patterns
+0055 56                    685     PUSH SI ; save the value of SI because it will be changed in Hex2String
+0056 E80000         E      686     Call Hex2String ;convert signed value to ASCII string
+0059 1E                    687     PUSH DS ;Hex2String was working in the data segment, and the Display function
+                           688             ; works in the ES. Thus, we need to exchange DS and ES to work in the
+                           689             ; ES
+005A 07                    690     POP ES
+005B 5E                    691     POP SI ;move SI to point at beginning of string again
+005C E8A1FF                692     Call Display ; convert string to segment patterns to display
+005F 61                    693     POPA
+0060 C3                    694     RET
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           695     
+                           696     DisplayHex      ENDP
+                           697     
+                           698     ; InitDisplay
+                           699     ;
+                           700     ; Description: This procedure clears the segment buffer, and also clears the 
+                           701     ;              variable used to track the index of the segment buffer up to which
+                           702     ;              the mux function has outputted to the LED display (Digit)
+                           703     ;
+                           704     ; Operation: This function does this by setting the first 8 values in the
+                           705     ;            segment buffer to 0 (because the display length is 8)
+                           706     ;
+                           707     ; Arguments:
+                           708     ; Return Value:
+                           709     ;
+                           710     ; Local Variables: None.
+                           711     ; Shared Variables: -segbuffer: used to store the segment pattern array;
+                           712     ;                   -digit: points to each index in the segbuffer to 
+                           713     ;                   track how many patterns have been outputted to the display
+                           714     ; Global Variables: none
+                           715     ;
+                           716     ; Input: None.
+                           717     ; Output: None.
+                           718     ;
+                           719     ; Error Handling: None.
+                           720     ;
+                           721     ; Algorithms: None.
+                           722     ; Data Structures:
+                           723     ;
+                           724     ;
+                           725     ; Registers Changed: None.
+                           726     ; Stack Depth: None.
+                           727     ;
+                           728     ; Limitations:
+                           729     ;
+                           730     ; Author: Meera Krishnamoorthy
+                           731     ; Last Modified: 10/29/16
+                           732     ;
+                           733     
+0061                       734     InitDisplay      PROC        NEAR
+                           735             PUBLIC      InitDisplay
+                           736             
+0061 60                    737     PUSHA
+0062 BB0000                738     MOV BX, 0 
+                           739     
+0065                       740     ClearBuffer:
+                           741             ; loops through the segment buffer for as many element as can be
+                           742             ; displayed on the display, setting each value in the buffer to 0
+0065 C78700000000   R      743             MOV segbuffer[BX], 0
+006B 43                    744             INC BX
+006C 83FB10                745             CMP BX, BUFFER_LENGTH
+006F 7CF4                  746             JL ClearBuffer
+                           747             ;JE EndInitVariable
+0071                       748     EndInitVariable:
+                           749             ; clears the digit variable (so that it points to the first
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           750             ; digit in the segment buffer)
+0071 A12800         R      751             MOV     AX, Digit
+0074 31062800       R      752             XOR     Digit, AX
+                           753             
+0078 61                    754     POPA
+0079 C3                    755             RET
+                           756             
+                           757     InitDisplay     ENDP
+                           758     
+                           759     
+                           760     ; MuxSegPatterns
+                           761     ;
+                           762     ; Description: This procedure puts the segment patterns we find in Display,
+                           763     ;              DisplayNum, and DisplayHex on the display using a timer
+                           764     ;              interrupt. It outputs a segment pattern stored in the array
+                           765     ;              in the data segment on to the display each time it is called, 
+                           766     ;              going in the order that the patterns were stored in the buffer.
+                           767     ; Operation: The function looks at segbuffer (the array in the data segment
+                           768     ;            that Display/DisplayNum/DisplayHex have been storing segment
+                           769     ;            patterns). It outputs one segment pattern to the display at a time
+                           770     ;            keeping track of the number of digits it has outputted to the 
+                           771     ;            display with the variable "digit". Once digit is equal to the 
+                           772     ;            maximum number of digits that can be displayed on the display,
+                           773     ;            it is set to 0, and the current segment buffer is displayed
+                           774     ;            on the display. 
+                           775     ;
+                           776     ; Arguments:
+                           777     ; Return Value:
+                           778     ;
+                           779     ; Local Variables: None.
+                           780     ; Shared Variables: -segbuffer: used to store the segment pattern array;
+                           781     ;                   -digit: points to each index in the segbuffer to 
+                           782     ;                   track how many patterns have been outputted to the display
+                           783     ; Global Variables: none
+                           784     
+                           785     ; Input: None.
+                           786     ; Output: None.
+                           787     ;
+                           788     ; Error Handling: None.
+                           789     ;
+                           790     ; Algorithms: None.
+                           791     ; Data Structures:
+                           792     ;
+                           793     ;
+                           794     ; Registers Changed: None.
+                           795     ; Stack Depth: None.
+                           796     ;
+                           797     ; Limitations:
+                           798     ;
+                           799     ; Author: Meera Krishnamoorthy
+                           800     ; Last Modified: 10/29/16
+                           801     ;
+                           802     
+007A                       803     MuxSegPatterns      PROC        NEAR
+                           804             PUBLIC      MuxSegPatterns
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+007A BB0000                805     MOV BX, 0   
+007D                       806     MuxPatterns:
+                           807         ; the segment buffer has 16 patterns to show 8 characters
+                           808         ; this code first takes the 8 + nth element of the segment
+                           809         ; buffer and displays it in the 8 + nth place on the display
+                           810         
+007D 8B1E2800       R      811         MOV     BX, Digit
+0081 D1E3                  812         SHL     BX, 1       ; get 8 + nth element
+0083 8B870000       R      813         MOV     AX, segbuffer[BX]  ; accesses current segment pattern to put on display
+                           814         
+0087 BA0800                815         MOV DX, LEDHighByteAdd ; move high byte of segment pattern into the 
+                           816                                ; address LEDHighByteAdd
+008A 86C4                  817         XCHG AL, AH
+008C EE                    818         OUT DX, AL
+                           819         
+                           820         ; then, this code first takes the nth element of the segment
+                           821         ; buffer and displays it in the nth place on the display
+                           822         
+                           823         
+008D D1EB                  824         SHR     BX, 1               ; get back nth element
+008F 83C300                825         ADD     BX, LEDDisplay     ;get the display address by offsetting original
+                           826                                    ; address of display with the current index of 
+                           827                                    ; the buffer being outputted
+0092 8BD3                  828         MOV     DX, BX             ; segment can only be outputted to DX 
+                           829                                    ; (reason for register change)
+                           830                                    
+0094 86C4                  831         XCHG AL, AH
+0096 EE                    832         OUT     DX, AL             ;output segment
+                           833     
+0097 8B1E2800       R      834         MOV    BX, Digit           ; increment Digit so that next time this
+                           835                                    ; function is called, it outputs the next
+                           836                                    ; element in the segment buffer
+009B 43                    837         INC    BX
+009C 83FB08                838         CMP    BX, DISPLAY_LEN
+009F 7D02                  839         JGE    ZeroDigit           ; accounts for potential wrapping
+00A1 7C06                  840         JL     EndMux
+                           841         
+00A3                       842     ZeroDigit:
+00A3 BB0000                843         MOV BX, 0
+00A6 EB0190                844         JMP EndMux
+                           845         
+00A9                       846     EndMux:
+00A9 891E2800       R      847         MOV   Digit, BX
+00AD C3                    848         RET
+                           849     
+                           850     MuxSegPatterns  ENDP
+                           851     
+----                       852     CODE    ENDS
+                           853     
+----                       854     DATA    SEGMENT PUBLIC  'DATA'
+                           855     
+0000 (16                   856     segbuffer       DW BUFFER_LENGTH  DUP (?) 
+     ????
+     )
+0020 (8                    857     stringbuffer    DB DISPLAY_LEN DUP (?)
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  18:17:45  12/09/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+     ??
+     )
+0028 ????                  858     Digit           DW                  ?               ;the current digit number
+                           859     
+----                       860     DATA    ENDS
+                           861     
+                           862     
+                           863     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

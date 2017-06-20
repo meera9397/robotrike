@@ -1,0 +1,1116 @@
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE SERIAL
+OBJECT MODULE PLACED IN SERIAL.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE SERIAL.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    SERIAL
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   SERIAL                                   ;
+                             6     ;     This file contains all functions necessary to transmit values to       ;
+                             7     ;                           other devices via serial port                    ;
+                             8     ;                                  EE/CS 51                                  ;
+                             9     ;                                                                            ;
+                            10     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            11     
+                            12     ; Overall Description: This function contains all the necessary functions
+                            13     ; to transmit values to other devices via serial port.
+                            14     ;
+                            15     ; Table of Contents:
+                            16     ; 1) InitSerial: initializes all the registers and values needed to transmit
+                            17     ; and receive data
+                            18     ; 2) SetSerialBaudRate: changes baud rate( by changing baud divisor)
+                            19     ; if bit in LCR is set to allow the baud rate to be changed. The baud
+                            20     ; rate is the rate at whcih the information is transferred in a communication
+                            21     ; channel. 
+                            22     ; 3) SetSerialParity: sets parity to be on or off depending on 
+                            23     ; input from init function. 
+                            24     ; 4) SerialEH: directs event handler to appropriate function to deal
+                            25     ; with current interrupt.
+                            26     ; 5) LSI_Function: function to deal with line status interrupts
+                            27     ; 6) RDI_Function: function to deal with received data interrupts
+                            28     ; 7) TEI_Function: function to deal with transmitter empty interrupts
+                            29     ; 8) MSI_Function: function to deal with modem status interrupts
+                            30     ; 9) SerialIRQTable: table called in SerialEH that has addresses to 
+                            31     ; functions to deal with interrupts. the index of this table is based
+                            32     ; on the interrupt identification register's values for each interrupt. 
+                            33     ; 10) BaudDivisorTable: lists several baud divisors corresponding
+                            34     ; to a 9.216 MHz clock input. 
+                            35     ;
+                            36     ; Revision History:
+                            37     ;    11/18/16  Meera Krishnamoorthy   wrote code
+                            38     
+                            39     
+                            40     CGROUP  GROUP   CODE
+                            41     DGROUP  GROUP   DATA
+                            42     
+----                        43     CODE    SEGMENT PUBLIC 'CODE'
+                            44     
+                            45     ASSUME  CS:CGROUP, DS: DGROUP
+                            46     
+                            47 +1  $INCLUDE(SERIAL.INC)
+                      =1    48     ; SERIAL.INC
+                      =1    49     ;
+                      =1    50     ; This file lists all the constants used in serial.asm
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     
+                      =1    52     ; Baud Rate Constants
+  0006                =1    53     BAUD_DIVISOR_INDEX    EQU     6   ; index to access Baud Divisor Table
+                      =1    54                                                                       ; to determine baud
+                                    rate to use
+                      =1    55     
+                      =1    56     ; Parity Constants
+  0002                =1    57     PARITY_OFF                        EQU     2   ; value to set to a register to set
+                      =1    58                                                                       ; parity off 
+                      =1    59     
+                      =1    60     ; Register I/O Addresses
+  0100                =1    61     SERIAL_START    EQU     100H      ; value serial registers start at
+                      =1    62     
+  0100                =1    63     DLL                         EQU     SERIAL_START       ;low byte of baud divisor (R/W
+                                   )
+  0101                =1    64     DLM                         EQU     SERIAL_START + 1   ;high byte of baud divisor (R/
+                                   W)
+  0100                =1    65     SERIAL_RX_REG   EQU     SERIAL_START       ;receive data register (R)
+  0100                =1    66     SERIAL_TX_REG   EQU     SERIAL_START       ;transmit data register (W)
+  0101                =1    67     SERIAL_IER      EQU     SERIAL_START + 1   ;interrupt enable register (R/W)
+  0102                =1    68     SERIAL_IIR      EQU     SERIAL_START + 2   ;interrupt ident. register (R/W)
+  0103                =1    69     SERIAL_LCR      EQU     SERIAL_START + 3   ;line control register (R/W)
+  0104                =1    70     SERIAL_MCR      EQU     SERIAL_START + 4   ;modem control register (R/W)
+  0105                =1    71     SERIAL_LSR      EQU     SERIAL_START + 5   ;line status register (R/W)
+  0106                =1    72     SERIAL_MSR      EQU     SERIAL_START + 6   ;modem status register (R/W)
+                      =1    73     
+                      =1    74     ; Constants for EnqueueEvent
+  0003                =1    75     LSI_CONST       EQU     03 ; constant to send to EnqueueEvent associatd
+                      =1    76                                                        ; with line status interrupt
+  0004                =1    77     RDI_CONST       EQU     04 ; constant to send to EnqueueEvent associatd
+                      =1    78                                                        ; with received data interrupt 
+                      =1    79                                                        
+                      =1    80     ; other interrupt constants                                                
+  0001                =1    81     NO_INTERRUPT    EQU             1  ; value of IIR that indicates no interrupts are oc
+                                   curring
+  000E                =1    82     MASK_NON_ERROR  EQU             00001110B ; bit pattern that masks all non-error
+                      =1    83                                                                       ; bits in the LSI
+                      =1    84     
+                      =1    85     ; LCR Register Values
+  0003                =1    86     TRANSMIT8CHAR     EQU    00000011B ; bits to be set in LCR to transmit 8 
+                      =1    87                                                                        ; characters
+  0002                =1    88     TRANSMIT7CHAR     EQU    00000010B ; bits to be set in LCR to transmit 7 
+                      =1    89                                                                        ; characters
+  0001                =1    90     TRANSMIT6CHAR     EQU    00000001B ; bits to be set in LCR to transmit 6 
+                      =1    91                                                                        ; characters
+  0000                =1    92     TRANSMIT5CHAR     EQU    00000000B ; bits to be set in LCR to transmit 5 
+                      =1    93                                                                        ; characters
+                      =1    94     ; one stop bit = 00000000B
+  0004                =1    95     MORE_1_STOP_BIT        EQU    00000100B ; bits to be set in LCR to have more
+                      =1    96                                                                                     ; tha
+                                   n 1 stop bit
+  0008                =1    97     ENABLE_PARITY          EQU    00001000B ; bits to be set in LCR to enable parity
+  0010                =1    98     EVEN_PARITY            EQU    00010000B ; bits to be set in LCR to have even
+                      =1    99                                                                                     ; par
+                                   ity 
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+  0020                =1   100     STICK_PARITY           EQU    00100000B ; bits to be set in LCR to have stick
+                      =1   101                                                                                     ; par
+                                   ity 
+  0040                =1   102     BREAK_CONTROL          EQU    01000000B ; bits to be set in LCR to have break control
+  0080                =1   103     DIVISOR_LATCH          EQU    10000000B ; bits to be set in LCR to enable 
+                      =1   104                                                                                     ; the
+                                    baud rate to be set (DLAB)
+                      =1   105     
+                      =1   106     ; IER Register Values
+  0008                =1   107     MODEM_STATUS              EQU   00001000B ; bits to be set in IER to enable
+                      =1   108                                                                                       ; m
+                                   odem status interrupts 
+  0004                =1   109     RECEIVER_LINE_STATUS      EQU   00000100B ; bits to be set in IER to enable
+                      =1   110                                                                                       ; r
+                                   eceiver line status interrupts
+  0002                =1   111     THRE                      EQU   00000010B ; bits to be set in IER to enable
+                      =1   112                                                                                       ; t
+                                   ransmitter holding register empty
+                      =1   113                                                                                       ; i
+                                   nterrupts
+  0001                =1   114     RECEIVED_DATA_AVAILABLE   EQU   00000001B ; bits to be set in IER to enable
+                      =1   115                                                                                       ; r
+                                   eceived data available interrupts 
+                           116 +1  $INCLUDE(QUEUES.INC)
+                      =1   117     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   118     ;                                  QUEUES.INC                                ;  
+                      =1   119     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   120     
+                      =1   121     ; This file contains constants for the functions needed to initialize and use
+                      =1   122     ; a queue (which are defined in queues.asm)
+                      =1   123     ;
+                      =1   124     ; Revision History:
+                      =1   125     ;    10/22/16  Meera Krishnamoorthy updated constants/ queue structure
+                      =1   126     
+                      =1   127     
+  0100                =1   128     queue_size equ 256 ; this variable describes the size of the queue
+  0002                =1   129     word_len equ 2 ; the size of a word is 2x the size of a bytes
+  0001                =1   130     byte_len equ 1 ; the size of a byte is set to "1"
+                      =1   131     
+                      =1   132     ; The following structure creates a queue with the following attributes:
+                      =1   133     ; 1) len: the total length the queue can be
+                      =1   134     ; 2) element_size: if this variable is 0, the element size is bytes. if this
+                      =1   135     ;                  variable is 1, then the element size is words.
+                      =1   136     ; 3) front: head pointer for queue
+                      =1   137     ; 4) rear: tail pointer for queue
+                      =1   138     ; 5) elements: the array to put all elements of the queue in 
+                      =1   139     ; 
+----                  =1   140     QueueStruct         STRUC
+0000                  =1   141         len             DW      ?
+0002                  =1   142         element_size    DW      ?
+0004                  =1   143         front           DW      ?
+0006                  =1   144         rear            DW      ?
+0008                  =1   145         elements        DB      (queue_size) DUP (?)
+----                  =1   146     QueueStruct ENDS
+                           147 +1  $INCLUDE(SIMPMAC.INC)
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   148 +1  $NOLIST
+                           520     
+                           521     EXTRN   QueueInit:NEAR
+                           522     EXTRN   QueueEmpty:NEAR
+                           523     EXTRN   QueueFull:NEAR
+                           524     EXTRN   Dequeue:NEAR
+                           525     EXTRN   Enqueue:NEAR
+                           526     EXTRN   EnqueueEvent:NEAR
+                           527     
+                           528     
+                           529     ; InitSerial
+                           530     ;
+                           531     ; Description: This function initializes all the registers and values
+                           532     ; needed to transmit and receive data. This involves initializing the
+                           533     ; TransmitterQueue, the baud rate, parity, the type of output of the serial, 
+                           534     ; and the type of interrupts that are enabled. It also sets the kickstart
+                           535     ; flag appropriately so that kickstarting will occur when something
+                           536     ; is added to the TransmitterQueue (because it is initialized to be empty). 
+                           537     ;
+                           538     ; Operation: The TransmitterQueue is initialized using the QueueInit function
+                           539     ; from the queues.asm file, which initializes all variables associated
+                           540     ; with the queue. Then, it sets the values in the Line Control Register 
+                           541     ; associated with the baud rate and parity (using external functions). It
+                           542     ; also sets the appropriate bits in the interrupt enable register to 
+                           543     ; enable all interrupts. Finally, it sets the kickstart flag to 1 to ensures
+                           544     ; kickstarting occurs when a character is enqueued to the TransmitterQueue. 
+                           545     ;
+                           546     ; Arguments: None.
+                           547     ; Return Value: None.
+                           548     ;
+                           549     ; Local Variables: None.
+                           550     ; Shared Variables:
+                           551     ; Global Variables: None.
+                           552     ;
+                           553     ; Input: None.
+                           554     ; Output: to line status register and interrupt enable register
+                           555     ;
+                           556     ; Error Handling: None.
+                           557     ;
+                           558     ; Algorithms: None.
+                           559     ; Data Structures: TransmitterQueue: a queue that holds characters to be
+                           560     ;                       sent to the data register in the 16C450, which performs
+                           561     ;                       serial to parallel conversion on data received
+                           562     ;                       from this queue.
+                           563     ;                    This structure defines a queue and all of its attributes:
+                           564     ;                       1) length: the total length that the queue can be
+                           565     ;                       2) element_size: if this variable is 1, the element
+                           566     ;                          size is word (2 bytes). if this variable is 2,
+                           567     ;                          the element size is one byte.
+                           568     ;                       3) front: describes the element of the array that is
+                           569     ;                          the front of the queue
+                           570     ;                       4) rear: describes the element of the array that is
+                           571     ;                          the back of the queue
+                           572     ;                       5) elements: an array with all the elements of the
+                           573     ;                          queue stored in it
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           574     ;
+                           575     ;
+                           576     ; Registers Changed: AX, BX, DX, SI
+                           577     ; Stack Depth: None.
+                           578     ;
+                           579     ; Limitations: None. 
+                           580     ;
+                           581     ; Author: Meera Krishnamoorthy
+                           582     ; Last Modified: 11/18/16
+                           583     ;
+                           584     
+0000                       585     InitSerial      PROC        NEAR
+                           586             PUBLIC      InitSerial
+                           587     
+                           588     ; initialize TransmitterQueue
+0000 8D360000       R      589     LEA SI, TransmitterQueue ; address of queue to be used is stored in SI, and
+                           590                              ; will be used in QueueInit, etc. to access
+                           591                              ; the queue
+0004 B80001                592     MOV AX, QUEUE_SIZE ; move the total size of the queue in AX, which will
+                           593                        ; be used in QueueInit to create the queue
+0007 B300                  594     MOV BL, 0 ; if BL is 0, then the elements stored in this queue will be bytes
+0009 E80000         E      595     Call QueueInit ; initializes queue with a size of QUEUE_SIZE, to be filled
+                           596                    ; with bytes, and to be stored at the address of TransmitterQueue
+                           597     
+                           598     ; set the LINE CONTROL REGISTER (LCR), which contains values to set the
+                           599     ; parity and the baud rate
+                           600     
+000C                       601     ClearLCR: 
+000C B80000                602             MOV AX, 0
+000F BA0301                603             MOV DX, SERIAL_LCR  ; set the address of DX to the LCR
+0012 EE                    604             OUT DX, AL ; clears out the current value of the LCR Register
+                           605     
+0013                       606     SetBaudRate: 
+0013 BB0600                607             MOV BX, BAUD_DIVISOR_INDEX ; this is the index of the table containing
+                           608                                                        ; baud divisors of the baud diviso
+                                   r we want
+                           609                                                        ; to use
+0016 E82200                610             Call SetSerialBaudRate ; call function to set the baud rate (by setting
+                           611                                                        ; the baud divisor) 
+                           612     
+0019                       613     SetParity: 
+0019 BB0200                614             MOV BX, PARITY_OFF  ; sets register that is used to determine
+                           615                                                     ; whether to turn parity on or off 
+                           616                             ; if BX != parity off, then BX = value to be
+                           617                             ; or-ed to AL to indicate parity setting
+                           618                             ; could be MOV BX, ENABLE_PARITY
+                           619                             ; OR BX, EVEN, PARITY 
+                           620                             ; to set up even parity
+001C E83700                621             Call SetSerialParity ; call function that will set parity if BX = 
+                           622                                                      ; PARITY_ON
+                           623             
+001F                       624     SetOtherPartsLCR:
+001F EC                    625         IN AL, DX ; get LCR value
+0020 0C03                  626             OR AL, TRANSMIT8CHAR ; set LCR so that outputs 8 bits at a time
+0022 0C04                  627             OR AL, MORE_1_STOP_BIT ; set LCR to have more than 1 stop bit
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           628             
+0024 BA0301                629             MOV DX, SERIAL_LCR  ; set the address of DX to the LCR (in event
+                           630                                                     ; it was elsewhere changed) 
+0027 EE                    631             OUT DX, AL; stores this new value in the line control register
+                           632     
+0028                       633     SetIER: ; set the INTERRUPT ENABLE REGISTER (IER)
+0028 B008                  634             MOV AL, MODEM_STATUS ; sets bit in IER to generate modem status interrupts 
+002A 0C04                  635             OR AL, RECEIVER_LINE_STATUS ; sets in IER bit to generate receiver line 
+                           636                                                                     ; status interrupts
+002C 0C02                  637             OR AL, THRE ; sets bit in IER  to generate transmitter holding register
+                           638                                 ; empty interrupts (ready for data to be sent to transmit
+                                   ter
+                           639                                 ; holding register) 
+002E 0C01                  640             OR AL, RECEIVED_DATA_AVAILABLE ; sets bit in IER to generate received
+                           641                                                                        ; data interrupts 
+                                   (data ready to be
+                           642                                                                        ; taken in) 
+                           643     
+0030 BA0101                644             MOV DX, SERIAL_IER ; set DX to be address of interrupt enable register
+                           645     
+0033 EE                    646             OUT DX, AL ; output value to interrupt enable register to enable all
+                           647                               ; interrupts
+                           648     
+0034 C60608010190   R      649     MOV KickStartFlag, 1 ; used to determine the need for kickstarting.
+                           650                                              ; kickstarting is needed if the TransmitterQ
+                                   ueue is 
+                           651                                              ; empty and values needed to be added to it 
+                                   in the
+                           652                                              ; SerialPutChar function. If the flag is 1, 
+                                   then 
+                           653                                              ; kickstarting needs to happen. If it's 0, k
+                                   ickstarting
+                           654                                              ; does not need to happen. This
+                           655                                              ; sets kick start flag to 1 because the Tran
+                                   smitterQueue
+                           656                          ; has no elements in it, so the IER needs to be
+                           657                                              ; kickstarted to register that a character h
+                                   as been
+                           658                                              ; added to the queue. 
+                           659     
+003A C3                    660     RET
+                           661     InitSerial      ENDP
+                           662     
+                           663     
+                           664     ; Function Name: SetSerialBaudRate
+                           665     ; Description: This function is called with AL as the current value
+                           666     ; to be sent to the line control register, DX as the address of the 
+                           667     ; line control register, and BX as the index pointing to the baud
+                           668     ; rate divisor to be used in the baud rate table. It sets the value
+                           669     ; in the line control register that allows the baud rate to be changed,
+                           670     ; changes the baud rate, and then clears that value in the line
+                           671     ; control register so the baud rate cannot be changed. 
+                           672     ;
+                           673     ; Operational Description: It does this by or-ing the current value
+                           674     ; of AL with a constant DIVISOR_LATCH, which sets the appropriate
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           675     ; bit in the line control register to change the baud rate. Once
+                           676     ; this value is outputted to the line control register, the baud rate
+                           677     ; can be changed. This involves accessing the appropriate value in the
+                           678     ; BaudDivisorTable (an index predetermined by BX). It outputs the lower
+                           679     ; bit of the baud divisor in the DLL register and the higher bit of the
+                           680     ; baud divisor in the DLM register. Then, it masks the appropriate bit 
+                           681     ; of the line control register to prevent the baud rate from being changed. 
+                           682     ; This is done by and-ing the current value of the AL with the inverse
+                           683     ; of the DIVISOR_LATCH. Since DIVISOR_LATCH only has the bit set 
+                           684     ; to set the baud rate, and-ing any value with the inverse of DIVISOR_LATCH 
+                           685     ; would cause 
+                           686     ; 
+                           687     ; Arguments: AL (current value to be sent to line control register): R, 
+                           688     ;                               8 bits, byte
+                           689     ;                    DX (address of line control register): R, 16 bits, word
+                           690     ;                        BX (index pointing to baud rate divisor to be used in baud r
+                                   ate
+                           691     ;                               table): R, 8 bits, byte 
+                           692     ; Return Values: None.
+                           693     ; Global Variables: None.
+                           694     ; Shared Variables: None. 
+                           695     ; Local Variables: None.
+                           696     ;
+                           697     ; Inputs: None.
+                           698     ; Outputs: to line status register
+                           699     ; User Interface: None.
+                           700     ; Error Handling: None.
+                           701     ; Algorithms: None.
+                           702     ;
+                           703     ; Data Structures: None.
+                           704     ; Known Bugs: None.
+                           705     ;
+                           706     ; Registers Changed: DX, AX, BX
+                           707     ; Stack Depth: None.
+                           708     ; Limitations: Divisor must be a value that exists on the table.
+                           709     ;
+                           710     ; Author: Meera Krishnamoorthy
+                           711     ; Last Modified: 11/18/16
+                           712     ;
+                           713     
+003B                       714     SetSerialBaudRate      PROC        NEAR
+                           715             PUBLIC      SetSerialBaudRate
+003B                       716     SetDLAB: 
+                           717 +1      
+003B 9C                    718 +1          PUSHF                           ;save flags
+003C FA                    719 +1          CLI                             ;disable the interrupts
+                           720 +1   ; this uses a macro to disable interrupts
+                           721                                     ; as this part of the code runs so that it doesn't 
+                           722                                     ; get interrupted (in the event that this code
+                           723                                     ; includes critical code) 
+003D EC                    724         IN AL, DX ; get LCR value
+003E 0C80                  725         OR AL, DIVISOR_LATCH ; sets bit in LCR to change baud rate
+0040 EE                    726         OUT DX, AL ; outputs those bits to the LCR
+                           727     
+0041                       728     ChangeBaudDivisor:
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0041 2E8B870001     R      729         MOV AX, CS:BaudDivisorTable[BX] ; get baud divisor associated with
+                           730                                                                             ; index set i
+                                   n BX
+                           731     
+0046 BA0001                732         MOV DX, DLL ; set DLL register address to DX
+0049 EE                    733         OUT DX, AL ; output low byte of baud divisor to DLL
+                           734       
+004A BA0101                735         MOV DX, DLM ; set DLM register address to DX
+004D 86E0                  736         XCHG AH, AL ; put high byte of AX into low byte (because out only outputs
+                           737                                     ; a value in AL)
+004F EE                    738         OUT DX, AL ; output high byte of baud divisor to DLM 
+                           739     
+0050                       740     ResetDLAB:
+0050 EC                    741         IN AL, DX ; get LCR value
+0051 247F                  742         AND AL, NOT(DIVISOR_LATCH) ; masks appropriate bit in LCR
+                           743                                                                ; so that baud rate cannot
+                           744                                                                ; be changed. because the 
+                                   bit is set in 
+                           745                                                                ; DIVISOR_LATCH, the inver
+                                   se of DIVISOR_LATCH
+                           746                                                                ; has that bit not set, so
+                                    anding any value with
+                           747                                                                ; NOT(DIVISOR_LATCH) cause
+                                   s the bit associatd
+                           748                                                                ; with setting the baud ra
+                                   te to be masked
+0053 EE                    749         OUT DX, AL ; sets baud rate permanently (makes it so that baud
+                           750                                ; rate can no longer be changed
+                           751         ; AL now has the current value of baud rate, so it can be or-ed with
+                           752             ; other bit patterns and outputted to the line control register
+0054                       753     EndSetSerialBaudRate:
+                           754 +1    
+0054 9D                    755 +1          POPF                            ;restore flags (interrupt flag in particular)
+                           756 +1   ; this turns interrupts back on 
+0055 C3                    757       RET
+                           758     SetSerialBaudRate       ENDP
+                           759     
+                           760     ; Function Name: SetSerialParity
+                           761     ; Description: This function is called with DX as the address of the 
+                           762     ; line control register and BX as either a value to turn parity off,
+                           763     ; or a bit pattern to be or-ed with the LCR to enable a specific
+                           764     ; type of parity. If parity is off, nothing happens. If parity is on,
+                           765     ; a value is sent to the line control register to turn a specific type of 
+                           766     ; parity on/
+                           767     ;
+                           768     ; Operational Description: This function checks BX to determine if parity
+                           769     ; should be turned on or off. If it is turned off, nothing
+                           770     ; is sent to the line control register. If it is turned on, the current
+                           771     ; value in the line control register is or-ed with BX to enable a specific
+                           772     ; type of parity. Then that value is sent to the line control register. 
+                           773     ; 
+                           774     ; Arguments: BX, DX
+                           775     ; Return Values: None.
+                           776     ; Global Variables: None.
+                           777     ; Shared Variables: None. 
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           778     ; Local Variables: None.
+                           779     ;
+                           780     ; Inputs: None.
+                           781     ; Outputs: to line status register
+                           782     ; User Interface: None.
+                           783     ; Error Handling: None.
+                           784     ; Algorithms: None.
+                           785     ;
+                           786     ; Data Structures: None.
+                           787     ; Known Bugs: None.
+                           788     ;
+                           789     ; Registers Changed: DX, AX, BX
+                           790     ; Stack Depth: None.
+                           791     ; Limitations: None. 
+                           792     ;
+                           793     ; Author: Meera Krishnamoorthy
+                           794     ; Last Modified: 11/18/16
+                           795     ;
+                           796     
+0056                       797     SetSerialParity      PROC        NEAR
+                           798             PUBLIC      SetSerialParity
+0056                       799     CheckParity: 
+0056 EC                    800       IN AL, DX ; get LCR value
+0057 83FB02                801       CMP BX, PARITY_OFF ; this compares the input with the value for PARITY_OFF
+                           802                                              ; to check whether to turn parity on or off
+                           803                                              
+005A 7403                  804       JE EndSetSerialParity ; if it matches, nothing is done.
+005C 0AC3                  805       OR AL, BL ; if it does, AL (current value of LCR) is or-ed with
+                           806                              ; sent in bit pattern to enable a specific type of parity
+005E EE                    807       OUT DX, AL ; output this value to the line control register
+005F                       808     EndSetSerialParity: 
+005F C3                    809       RET
+                           810     SetSerialParity ENDP
+                           811     
+                           812     
+                           813     ; Function Name: SerialPutChar
+                           814     ; Description: This function outputs the passed character (c) to
+                           815     ; the serial channel. It returns with the carry flag reset if the character
+                           816     ; has been "output", (put in the channel's queue, not necessarily sent over
+                           817     ; the serial channel) and set otherwise (transmit queue is full).
+                           818     ; The character c is passed in value in AL. ; If the kickstart flag is set 
+                           819     ; and enqueueing occurs, kickstarting will ensue.
+                           820     ; Kickstarting occurs because we want the system to acknowledge a value
+                           821     ; has been enqueued to the TransmitterQueue, and it might not be if 
+                           822     ; too many interrupts are happening for the system to process this information,
+                           823     ; and send it to the transmitter holding register. 
+                           824     ;
+                           825     ; Operational Description: This is done using the written functions
+                           826     ; QueueFull and Enqueue. If the TransmitterQueue is Full (if the zero flag is set
+                           827     ; by the QueueFull function), nothing will be enqueued and the carry
+                           828     ; flag will be set.  Else, "c" will be enqueued and the carry flag is reset.
+                           829     ; If the kickstart flag is set and enqueueing occurs, then the kickstart
+                           830     ; flag will be reset and the interrupt enable register will be kickstarted
+                           831     ; (all interrupts will be turned off and then back on). 
+                           832     ;
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           833     ; Arguments: AL, register that holds the character (c) to be sent to the
+                           834     ; serial channel
+                           835     ;
+                           836     ; Return Values: None.
+                           837     ;
+                           838     ; Global Variables: None.
+                           839     ; Shared Variables: None.
+                           840     ; Local Variables: None.
+                           841     ;
+                           842     ; Inputs: None.
+                           843     ; Outputs: None.
+                           844     ; User Interface: None.
+                           845     ; Error Handling: None.
+                           846     ; Algorithms: None.
+                           847     ;
+                           848     ; Data Structures: TransmitterQueue: a queue that holds characters to be
+                           849     ;                       sent to the data register in the 16C450, which performs
+                           850     ;                       serial to parallel conversion on data received
+                           851     ;                       from this queue.
+                           852     ;                    This structure defines a queue and all of its attributes:
+                           853     ;                       1) length: the total length that the queue can be
+                           854     ;                       2) element_size: if this variable is 1, the element
+                           855     ;                          size is word (2 bytes). if this variable is 2,
+                           856     ;                          the element size is one byte.
+                           857     ;                       3) front: describes the element of the array that is
+                           858     ;                          the front of the queue
+                           859     ;                       4) rear: describes the element of the array that is
+                           860     ;                          the back of the queue
+                           861     ;                       5) elements: an array with all the elements of the
+                           862     ;                          queue stored in it
+                           863     ; Limitations: None.
+                           864     ; Known Bugs: None.
+                           865     
+                           866     ;
+                           867     ; Registers Changed: SI, carry flag, AX, DX
+                           868     ; Stack Depth: 1 word
+                           869     ;
+                           870     ; Author: Meera Krishnamoorthy
+                           871     ; Last Modified: 11/18/16
+                           872     
+0060                       873     SerialPutChar      PROC        NEAR
+                           874             PUBLIC      SerialPutChar
+0060 8D360000       R      875     LEA SI, TransmitterQueue ; sets SI to address of queue
+0064 50                    876     PUSH AX  ; saves AX which stores value to be outputted to queue because
+                           877                      ; the QueueFull function changes the value of AX
+0065 E80000         E      878     Call QueueFull  ; checks if queue is full
+0068 58                    879     POP AX
+0069 7504                  880     JNZ CanEnqueue ; if queue not full, can enqueue value to it
+                           881     
+006B                       882     CannotEnqueue: ; if queue full, cannot enqueue to it
+006B F9                    883       STC ; sets carry flag
+006C EB2590                884       JMP EndSerialPutChar ; leave function
+                           885     
+006F                       886     CanEnqueue:
+006F 8D360000       R      887       LEA SI, TransmitterQueue ; reset SI in case it has been changed since
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           888 +1    
+0073 9C                    889 +1          PUSHF                           ;save flags
+0074 FA                    890 +1          CLI                             ;disable the interrupts
+                           891 +1   ; this uses a macro to disable interrupts
+                           892                                       ; as this part of the code runs so that it doesn't 
+                           893                                       ; get interrupted (in the event that this code
+                           894                                       ; includes critical code) 
+0075 E80000         E      895       Call Enqueue ; enqueues AL to the TransmitterQueue
+                           896 +1    
+0078 9D                    897 +1          POPF                            ;restore flags (interrupt flag in particular)
+                           898 +1    ; turns on interrupts
+0079 803E080101     R      899       CMP KickStartFlag, 1 ; sees if kickstarting is needed (if kickstart
+                           900                                                ; flag is 1) 
+007E 7512                  901       JNE EnqueueSetFlag ; if it is not, can move on to clear flag
+                           902       
+0080                       903     KickStart:
+0080 C60608010090   R      904       MOV KickStartFlag, 0 ; since the queue is no longer empty, do not 
+                           905                                                ; need to kickstart, so set kickstart to 0
+                           906     
+                           907       
+0086 BA0101                908       MOV DX, SERIAL_IER  ; set the address to the interrupt enable register
+                           909                                              ; (will be changing values in this register 
+                                   in order
+                           910                                              ; to shock system) 
+0089 EC                    911       IN AL, DX ; save current value of interrupt enable register
+008A 8AC8                  912       MOV CL, AL ; put saved value in CL
+008C B000                  913       MOV AL, 0  ; disable interrupts (bits set in AL determine interrupts
+                           914                              ; that are turned on) 
+008E EE                    915       OUT DX, AL 
+                           916     
+                           917       ; re-enable interrupts
+008F 8AC1                  918       MOV AL, CL; get back saved value of interrupt enable register
+0091 EE                    919       OUT DX, AL ; sends new value to AL to make sure interrupts are enabled again
+                           920       
+0092                       921     EnqueueSetFlag:
+0092 F8                    922       CLC ; clear carry flag (so system knows value has been enqueued) 
+                           923       
+0093                       924     EndSerialPutChar:
+0093 C3                    925       RET
+                           926     
+                           927     SerialPutChar   ENDP
+                           928     
+                           929     
+                           930     ; Function Name: SerialEH
+                           931     ; Description: This function is called when any interrupt occurs. It
+                           932     ; finds out what interrupt has occurred, and then determines how to proceed
+                           933     ; by using a table with functions written to deal with each interrupt
+                           934     ; that could occur. The IIR has four potential values: 0, 2, 4, and 6.
+                           935     ; Those values are indexes in the tableSerialIRQTable -- this table has addresses
+                           936     ; of the functions that deal with these interrupts at indexes that match
+                           937     ; those interrupts' IIR value. 
+                           938     ;
+                           939     ; Operational Description: This function is called when an interrupt occurs,
+                           940     ; and checks the interrupt identifying register (IIR) to determine what kind
+                           941     ; of interrupt occurred. Once the function has identified the type of
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           942     ; interrupt that occurred, it looks up the associated register in
+                           943     ; SerialIRQTable, a jump table that associates IIR values with addresses of
+                           944     ; functions written to deal with the interrupts.
+                           945     ; If the IIR is 1, then we can exit out of this function because no 
+                           946     ; interrupts are occurring.If it is not, we must keep looping to check for 
+                           947     ; interrupts. 
+                           948     ;
+                           949     ; Arguments: None.
+                           950     ; Return Values: None.
+                           951     ;
+                           952     ; Global Variables: None.
+                           953     ; Shared Variables: None.
+                           954     ; Local Variables: None.
+                           955     ;
+                           956     ; Inputs: None.
+                           957     ; Outputs: None.
+                           958     ; User Interface: None.
+                           959     ; Error Handling: None.
+                           960     ; Algorithms: None.
+                           961     ;
+                           962     ; Data Structures: SerialIRQTable: a jump table that associates IIR values
+                           963     ;                  with addresses of functions written to deal with
+                           964     ;                  interrupts.
+                           965     ;
+                           966     ; Limitations: The IIR needs to be valid.
+                           967     ; Known Bugs: None.
+                           968     ;
+                           969     ; Registers: AX, BX, DX
+                           970     ;
+                           971     ; Author: Meera Krishnamoorthy
+                           972     ; Last Modified: 11/18/16
+                           973     ;
+                           974     
+0094                       975     SerialEH      PROC        NEAR
+                           976             PUBLIC      SerialEH
+                           977     
+0094 B80000                978     MOV AX, 0 ; clear AX, will hold value from interrupt identifying register
+0097 BB0000                979     MOV BX, 0 ; clear BX, will hold index of SerialIRQTable to go to, 
+                           980                       ; which determines function to go to to deal with interrupt
+                           981     
+009A                       982     CheckInterrupts: 
+009A BA0201                983             MOV DX, SERIAL_IIR ; address of interrupt identifying register
+009D EC                    984             IN AL, DX ; read from interrupt identifying register to identify
+                           985                               ; the interrupt that occurred
+009E 8AC8                  986         MOV CL, AL ; save value of interrupt identifying register
+00A0 80E101                987         AND CL, NO_INTERRUPT ; mask all bits but bit 0 before check 
+00A3 80F901                988             CMP CL, NO_INTERRUPT ; there is a value of the IIR (NO_INTERRUPT)
+                           989                                                      ; that indicates there are no interr
+                                   upts, which
+                           990                                                      ; will allow us to exit this functio
+                                   n. if the IIR
+                           991                                                      ; is this value, we can exit the fun
+                                   ction                                               
+00A6 7409                  992             JE EndSerialEH
+00A8 8AD8                  993             MOV BL, AL ; move value read into BX so that it can be used to
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           994                                ; index the SerialIRQTable.
+00AA 2EFF97F800     R      995             Call CS:SerialIRQTable[BX] ; the SerialIRQTable is indexed based on the
+                           996                                                                ; interrupt identifying re
+                                   gister values.
+                           997                                                                ; each potential interrupt
+                                    identifying
+                           998                                    ; register value corresponds to an index
+                           999                                    ; in this table that points to a function
+                          1000                                    ; that deals with the interrupts.
+00AF EBE9                 1001             JMP CheckInterrupts     ; continue to loop to check if interrupts
+                          1002                                                     ; are there 
+                          1003     
+00B1                      1004     EndSerialEH: 
+00B1 C3                   1005             RET
+                          1006     
+                          1007     SerialEH        ENDP
+                          1008     
+                          1009     
+                          1010     ; LSI_Function
+                          1011     ;
+                          1012     ; Description: This function is called when an a line status interrupt
+                          1013     ; occurs. This interrupt occurs when an error occurs. It enqueues AX
+                          1014     ; to the event queue, where AH is a constant representing that a Line Status 
+                          1015     ; Interrupt occurred, and AL is the value of the Line Status Register.
+                          1016     ;
+                          1017     ; Operational Description: This is done by setting AL to the value 
+                          1018     ; of the Line Status Register, and AH to a constant indicating that a line 
+                          1019     ; status interrupt occurred. This function enqueues the register AX to the 
+                          1020     ; event queue.
+                          1021     ;
+                          1022     ; Arguments: None.
+                          1023     ;
+                          1024     ; Return Values: None.
+                          1025     ;
+                          1026     ; Global Variables: None.
+                          1027     ; Shared Variables: None.
+                          1028     ; Local Variables: None.
+                          1029     ;
+                          1030     ; Inputs: (from line status register) 
+                          1031     ; Outputs: None.
+                          1032     ; User Interface: None.
+                          1033     ; Error Handling: None.
+                          1034     ; Algorithms: None.
+                          1035     ;
+                          1036     ; Data Structures: None.
+                          1037     ;
+                          1038     ; Limitations: None.
+                          1039     ; Known Bugs: None.
+                          1040     ;
+                          1041     ; Registers Changed: AX, DX
+                          1042     ; Stack Depth: None.
+                          1043     ;
+                          1044     ;
+                          1045     ; Author: Meera Krishnamoorthy
+                          1046     ; Last Modified: 11/18/16
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   14
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1047     ;
+                          1048     
+00B2                      1049     LSI_Function      PROC        NEAR
+                          1050             PUBLIC      LSI_Function
+                          1051     
+00B2 B80000               1052     MOV AX, 0 ; clears AX register because will be reading in value from
+                          1053               ; register into AL
+00B5 BA0501               1054     MOV DX, SERIAL_LSR ; get location of line status register which tells
+                          1055                        ; us if an error occurs.
+00B8 EC                   1056     IN AL, DX ; reads in value from line status register, stores in AL
+00B9 240E                 1057     AND AL, MASK_NON_ERROR ; mask non-error bits of line status register
+00BB 3C00                 1058     CMP AL, 0 ; check if there is an error after masking non error bits
+00BD 7405                 1059     JE EndLSI_Function
+                          1060     
+00BF B403                 1061     MOV AH, LSI_CONST ; moves constant representing a line status interrupt
+                          1062                     ; occurred
+                          1063     
+00C1 E80000         E     1064     Call EnqueueEvent ; enqueues this event to show that this interrupt with
+                          1065                       ; a value of AL in the LSR has occurred
+                          1066     
+00C4                      1067     EndLSI_Function: 
+00C4 C3                   1068         RET
+                          1069     LSI_Function    ENDP
+                          1070     
+                          1071     
+                          1072     ; Function Name: RDI_Function
+                          1073     ; Description: This function is called when an a received data interrupt
+                          1074     ; occurs. This interrupt occurs when the serial port received some
+                          1075     ; information from another board or serial chip. It enqueues to the EventQueue
+                          1076     ; AX, where AH is a constant representing that a Received Status Interrupt occurred,
+                          1077     ; and AL is the value of the Receiver Buffer Register.
+                          1078     ;
+                          1079     ; Operational Description: This is done by setting the register AL to the
+                          1080     ; value of the Receiver Buffer Register, and AH to a constant indicating that
+                          1081     ; a received data interrupt occurred.
+                          1082     ; Finally, this function enqueues the register AX to the event queue.
+                          1083     ;
+                          1084     ; Arguments: None.
+                          1085     ; Return Values: None.
+                          1086     ;
+                          1087     ; Global Variables: None.
+                          1088     ; Shared Variables: None.
+                          1089     ; Local Variables: None.
+                          1090     ;
+                          1091     ; Inputs: (from the receiver buffer register) 
+                          1092     ; Outputs: None.
+                          1093     ; User Interface: None.
+                          1094     ; Error Handling: None.
+                          1095     ; Algorithms: None.
+                          1096     ;
+                          1097     ; Data Structures: None
+                          1098     ; Limitations: None.
+                          1099     ; Known Bugs: None.
+                          1100     ;
+                          1101     ; Registers Changed: AX, DX
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   15
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1102     ; Stack Depth: None.
+                          1103     ;
+                          1104     ;
+                          1105     ; Author: Meera Krishnamoorthy
+                          1106     ; Last Modified: 11/18/16
+                          1107     ;
+                          1108     
+00C5                      1109     RDI_Function      PROC        NEAR
+                          1110             PUBLIC      RDI_Function
+                          1111     
+00C5 B80000               1112     MOV AX, 0 ; clears AX register because will be reading in value from
+                          1113               ; register into AL
+00C8 BA0001               1114     MOV DX, SERIAL_RX_REG ; get location of received buffer register, which holds
+                          1115                           ; data received from other devices
+                          1116     
+00CB EC                   1117     IN AL, DX ; reads in value in received buffer register (information from
+                          1118               ; other devices)
+00CC B404                 1119     MOV AH, RDI_CONST ; constant stating we have received data from another
+                          1120                       ; device (received data interrupt)
+                          1121     
+00CE E80000         E     1122     Call EnqueueEvent ; enqueues this event to show that this interrupt with
+                          1123                       ; a value of AL in the received buffer register
+                          1124                       ; has occurred.
+                          1125     
+00D1 C3                   1126     RET
+                          1127     RDI_Function    ENDP
+                          1128     
+                          1129     
+                          1130     ; Function Name: TEI_Function
+                          1131     ; Description: This function is called when an a transmitter empty interrupt
+                          1132     ; occurs. This interrupt occurs when the serial port is ready to accept more
+                          1133     ; data. If the TransmitterQueue is empty, the kickstart flag is set, indicating
+                          1134     ; kickstarting will need to happen when a character is enqueued to the 
+                          1135     ; transmitter queue. 
+                          1136     ; If the TransmitterQueue is not empty, this queue will dequeue the
+                          1137     ; the TransmitterQueue and send the information to the Transmitter
+                          1138     ; Register. It also enqueues to the EventQueue AX, where AH is a constant
+                          1139     ; representing that a Transmitter Empty Interrupt occurred, and AL
+                          1140     ; is the value of the Transmitter Holding Register.
+                          1141     ;
+                          1142     ; Operational Description: This is called by setting AL to the Transmitter
+                          1143     ; Holding Register value and AH to a constant indicating that a transmitter empty
+                          1144     ; interrupt occurred. Then it enqueues AX to the EventQueue. It
+                          1145     ; also dequeues the TransmitterQueue if the transmitting queue is not empty,
+                          1146     ; and sends that information to Transmitter Holding Register. Finally, 
+                          1147     ; if the TransmitterQueue is empty, the kickstart flag is set to indicate
+                          1148     ; that kickstarting will need to occur when a character is enqueued to
+                          1149     ; the TransmitterQueue. 
+                          1150     ;
+                          1151     ; Arguments: None.
+                          1152     ;
+                          1153     ; Return Values: None.
+                          1154     ;
+                          1155     ; Global Variables: None.
+                          1156     ; Shared Variables: None.
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   16
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1157     ; Local Variables: None.
+                          1158     ;
+                          1159     ; Inputs: None.
+                          1160     ; Outputs: (to the transmitter holding register) 
+                          1161     ; User Interface: None.
+                          1162     ; Error Handling: None.
+                          1163     ; Algorithms: None.
+                          1164     ;
+                          1165     ; Data Structures:  TransmitterQueue: a queue that holds characters to be
+                          1166     ;                       sent to the data register in the 16C450, which performs
+                          1167     ;                       serial to parallel conversion on data received
+                          1168     ;                       from this queue.
+                          1169     ;                    This structure defines a queue and all of its attributes:
+                          1170     ;                       1) length: the total length that the queue can be
+                          1171     ;                       2) element_size: if this variable is 1, the element
+                          1172     ;                          size is word (2 bytes). if this variable is 2,
+                          1173     ;                          the element size is one byte.
+                          1174     ;                       3) front: describes the element of the array that is
+                          1175     ;                          the front of the queue
+                          1176     ;                       4) rear: describes the element of the array that is
+                          1177     ;                          the back of the queue
+                          1178     ;                       5) elements: an array with all the elements of the
+                          1179     ;                          queue stored in it
+                          1180     ;
+                          1181     ; Limitations: None.
+                          1182     ; Known Bugs: None.
+                          1183     ;
+                          1184     ; Registers Changed: SI, DX, AX, flags
+                          1185     ; Stack Depth: None.
+                          1186     ;
+                          1187     ;
+                          1188     ; Author: Meera Krishnamoorthy
+                          1189     ; Last Modified: 11/18/16
+                          1190     ;
+                          1191     
+00D2                      1192     TEI_Function      PROC        NEAR
+                          1193             PUBLIC      TEI_Function
+                          1194     
+00D2 8D360000       R     1195     LEA SI, TransmitterQueue ; store address of TransmitterQueue in SI so that
+                          1196                                                      ; it can be accessed in QueueEmpty f
+                                   unction
+00D6 E80000         E     1197     Call QueueEmpty ; check if TransmitterQueue is empty 
+00D9 7411                 1198     JE CannotOutput ; if kickstart flag is set
+                          1199     
+00DB                      1200     OutputTxQueue:
+00DB 8D360000       R     1201       LEA SI, TransmitterQueue ; ensures that the TransmitterQueue address
+                          1202                                                        ; is in SI
+                          1203 +1    
+00DF 9C                   1204 +1          PUSHF                           ;save flags
+00E0 FA                   1205 +1          CLI                             ;disable the interrupts
+                          1206 +1   ; this uses a macro to disable interrupts
+                          1207                                     ; as this part of the code runs so that it doesn't 
+                          1208                                     ; get interrupted (in the event that this code
+                          1209                                     ; includes critical code) 
+00E1 E80000         E     1210       Call Dequeue ; dequeue transmitter queue
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   17
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1211                    ; outputs dequeued value to AH
+                          1212 +1    
+00E4 9D                   1213 +1          POPF                            ;restore flags (interrupt flag in particular)
+                          1214 +1   ; sets interrupts to occur again
+00E5 BA0001               1215       MOV DX, SERIAL_TX_REG ; address of transmitter register
+00E8 EE                   1216       OUT DX, AL ; moves a character from the transmitter queue to the transmitter
+                          1217                  ; holding register, which will send the character to another
+                          1218                  ; device
+00E9 EB0790               1219       JMP EndTEI_Function ; jump to the end
+                          1220     
+00EC                      1221     CannotOutput:
+00EC C60608010190   R     1222       MOV KickStartFlag, 1 ; if cannot output, set kickstart flag to indicate
+                          1223                                                ; kickstarting must occur 
+                          1224     
+00F2                      1225     EndTEI_Function:
+00F2 C3                   1226       RET
+                          1227     
+                          1228     TEI_Function    ENDP
+                          1229     
+                          1230     
+                          1231     ; Function Name: MSI_Function
+                          1232     ; Description: This function deals with modem status interrupts. For now,
+                          1233     ; it does nothing but read in the modem status register and return --
+                          1234     ; we are not dealing with modem status interrupts. 
+                          1235     ;
+                          1236     ; Operational Description: This function reads the modem status register
+                          1237     ; and returns. 
+                          1238     ; Arguments: None.
+                          1239     ;
+                          1240     ; Return Values: None.
+                          1241     ;
+                          1242     ; Global Variables: None.
+                          1243     ; Shared Variables: None.
+                          1244     ; Local Variables: None.
+                          1245     ;
+                          1246     ; Inputs: None.
+                          1247     ; Outputs: None.
+                          1248     ; User Interface: None.
+                          1249     ; Error Handling: None.
+                          1250     ; Algorithms: None.
+                          1251     ;
+                          1252     ; Data Structures: None.
+                          1253     ;
+                          1254     ; Limitations: None.
+                          1255     ; Known Bugs: None.
+                          1256     ;
+                          1257     ; Registers Changed: AX, DX
+                          1258     ; Stack Depth: None.
+                          1259     ;
+                          1260     ;
+                          1261     ; Author: Meera Krishnamoorthy
+                          1262     ; Last Modified: 11/18/16
+                          1263     ;
+                          1264     
+00F3                      1265     MSI_Function      PROC        NEAR
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   18
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                          1266             PUBLIC      MSI_Function
+00F3 BA0601               1267     MOV DX, SERIAL_MSR
+00F6 EC                   1268     IN AL, DX
+00F7 C3                   1269     RET
+                          1270     
+                          1271     MSI_Function    ENDP
+                          1272     ; _____________________________________________________________________________
+                          1273     ; SerialIRQTable
+                          1274     ;
+                          1275     ; Description:      This table associates values of the interrupt
+                          1276     ;                   identifying register with the address of functions
+                          1277     ;                   to deal with registers.
+                          1278     ;
+                          1279     ; Notes:            READ ONLY tables should always be in the code segment so
+                          1280     ;                   that in a standalone system it will be located in the
+                          1281     ;                   ROM with the code.
+                          1282     ;
+                          1283     ; Author:           Meera Krishnamoorthy
+                          1284     ; Last Modified:    11/12/16
+00F8                      1285     SerialIRQTable       LABEL   WORD
+                          1286             PUBLIC  SerialIRQTable
+                          1287     
+00F8 F300           R     1288     DW        offset(MSI_Function)   ; IIR = 0, Modem Status Interrupt. Call
+                          1289                                      ; function to deal with that
+                          1290     
+00FA D200           R     1291     DW        offset(TEI_Function)   ; IIR = 2, Transmitter Holding Register Empty
+                          1292                                      ; Interrupt. Call function to deal with that
+                          1293     
+00FC C500           R     1294     DW        offset(RDI_Function)  ; IIR = 4, Received Data Available interrupt.
+                          1295                                     ; Call function to deal with that
+                          1296     
+00FE B200           R     1297     DW        offset(LSI_Function)  ; IIR = 6, Receiver Line Status interrupt.
+                          1298                                     ; Call function to deal with that
+                          1299     
+                          1300     
+                          1301     ; _____________________________________________________________________________
+                          1302     ; BaudDivisorTable
+                          1303     ;
+                          1304     ; Description:      This table contains the divisors needed to
+                          1305     ;                   generate a 16x clock using a 9.216 MHz clock input
+                          1306     ;
+                          1307     ; Notes:            READ ONLY tables should always be in the code segment so
+                          1308     ;                   that in a standalone system it will be located in the
+                          1309     ;                   ROM with the code.
+                          1310     ;
+                          1311     ; Author:           Meera Krishnamoorthy
+                          1312     ; Last Modified:    11/12/16
+0100                      1313     BaudDivisorTable       LABEL   WORD
+                          1314             PUBLIC  BaudDivisorTable
+                          1315     
+0100 0A00                 1316     DW        10
+0102 0F00                 1317     DW        15
+0104 1E00                 1318     DW        30
+0106 3C00                 1319     DW        60
+0108 5000                 1320     DW        80
+8086/87/88/186 MACRO ASSEMBLER    SERIAL                                                   14:13:27  12/04/;6  PAGE   19
+
+
+LOC  OBJ                  LINE     SOURCE
+
+010A 7800                 1321     DW        120
+010C A000                 1322     DW        160
+                          1323     
+                          1324     
+----                      1325     CODE    ENDS
+                          1326     
+                          1327     
+                          1328     ;the data segment
+                          1329     
+----                      1330     DATA    SEGMENT PUBLIC  'DATA'
+                          1331     
+0000 ????                 1332     TransmitterQueue QueueStruct <>  ; creates an instance of the queue structure   
+0002 ????
+0004 ????
+0006 ????
+0008 (256
+     ??
+     )
+                          1333                                      ; to be used to send characters to the
+                          1334                                      ; transmitter holding receiver
+                          1335     
+0108 ??                   1336     KickStartFlag      DB    ?       ; states if we need to kick start the Interrupt
+                          1337                                      ; enable register. set to 0 if we do not,
+                          1338                                      ; and 1 if we do.
+                          1339     
+----                      1340     DATA    ENDS
+                          1341     
+                          1342     
+                          1343     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

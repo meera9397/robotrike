@@ -1,0 +1,111 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     15:18:36  11/26/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN
+OBJECT MODULE PLACED IN MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                   HW8TEST                                  ;
+                             5     ;                            Homework #8 Test Code                           ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      This program tests the parser functions for Homework
+                            11     ;                   #8.  It calls an external function (ParseTest) to that
+                            12     ;                   tests all functions in parser.asm and phelp.asm to
+                            13     ;                   ensure that accurate parsing occurs.
+                            14     
+                            15     ; Input:            None.
+                            16     ; Output:           None.
+                            17     ;
+                            18     ; User Interface:   User can set break points at CompareOK and Miscompare,
+                            19     ;                   and check if each test case that ParseTest calls
+                            20     ;                   is correctly handled by parser functions.
+                            21     ; Error Handling:   None.
+                            22     ;
+                            23     ; Algorithms:       None.
+                            24     ; Data Structures:  None.
+                            25     ;
+                            26     ; Known Bugs:       None.
+                            27     ; Limitations:      None.
+                            28     ;
+                            29     ; Revision History:
+                            30     ;    11/25/16       Meera Krishnamoorthy    created file based on Homework 2
+                            31     ;                                           test code and modified
+                            32     
+                            33     
+                            34     
+                            35     ;definitions
+                            36     
+                            37     CGROUP  GROUP   CODE
+                            38     DGROUP  GROUP   DATA, STACK
+                            39     
+----                        40     CODE    SEGMENT PUBLIC 'CODE'
+                            41     
+                            42     
+                            43             ASSUME  CS:CGROUP, DS:DGROUP
+                            44     
+                            45     
+                            46     
+                            47     ;external function declarations
+                            48     
+                            49             EXTRN   ParseTest:NEAR         ;in the hw8 object file
+                            50             EXTRN   InitParser:NEAR
+8086/87/88/186 MACRO ASSEMBLER    MAIN                                                     15:18:36  11/26/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+0000                        52     START:
+                            53     
+0000                        54     MAIN:
+0000 B8----         R       55             MOV     AX, DGROUP              ;initialize the stack pointer
+0003 8ED0                   56             MOV     SS, AX
+0005 BCE00190       R       57             MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            58     
+0009 B8----         R       59             MOV     AX, DGROUP              ;initialize the data segment
+000C 8ED8                   60             MOV     DS, AX
+                            61     
+000E E80000         E       62             CALL    InitParser            ; sets up shared variables for
+                            63                                           ; parser functions to be called
+0011 E80000         E       64             CALL    ParseTest             ; calls function that will test
+                            65                                           ; parser functions in parser.asm
+                            66     
+                            67     
+----                        68     CODE ENDS
+                            69     
+                            70     ;the data segment. initialized because used later on
+                            71     
+----                        72     DATA    SEGMENT PUBLIC  'DATA'
+                            73     
+                            74     
+----                        75     DATA    ENDS
+                            76     
+                            77     
+                            78     
+                            79     
+                            80     ;the stack
+                            81     
+----                        82     STACK   SEGMENT STACK  'STACK'
+                            83     
+0000 (80                    84                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                            85     
+01E0                        86     TopOfStack      LABEL   WORD
+                            87     
+----                        88     STACK   ENDS
+                            89     
+                            90     
+                            91     
+                            92     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

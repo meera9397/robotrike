@@ -1,0 +1,171 @@
+8086/87/88/186 MACRO ASSEMBLER    INT2                                                     14:13:30  12/04/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE INT2
+OBJECT MODULE PLACED IN INT2.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE INT2.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1            NAME  INT2
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                   INT2                                     ;
+                             5     ;                       Interrupt Enabler Function to set up event               ;
+                             6     ;                                   handler                                  ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; Description:      This program contains the function to enable the interrupts
+                            10     ;                                       to be used to control event handlers. 
+                            11     ; Table of Contents: 
+                            12     ; 1) InitInt2: Sets up INT2 register to enable interrupts
+                            13     ;
+                            14     ; Revision History:
+                            15     ;      11/18/16  Meera Krishnamoorthy   wrote 
+                            16     
+                            17     
+                            18     ; local include files
+                            19 +1  $INCLUDE(EH.INC)
+                      =1    20     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    21     ;                                                                            ;
+                      =1    22     ;                                      EH.INC                                ;
+                      =1    23     ;                              Event Handler Demo                            ;
+                      =1    24     ;                                 Include File                               ;
+                      =1    25     ;                                                                            ;
+                      =1    26     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    27     
+                      =1    28     ; This file contains the definitions for the Event Handler Demonstration
+                      =1    29     ; program (EH.ASM)
+                      =1    30     
+  0001                =1    31     FIRST_RESERVED_VEC      EQU     1       ;reserve vectors 1-3
+  0003                =1    32     LAST_RESERVED_VEC       EQU     3
+  0100                =1    33     NUM_IRQ_VECTORS         EQU     256     ;number of interrupt vectors
+                      =1    34     
+                      =1    35     
+                            36 +1  $INCLUDE(IRQ.INC)
+                      =1    37     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    38     ;                                                                            ;
+                      =1    39     ;                                 INTERRUPT.INC                              ;
+                      =1    40     ;                              Event Handler Demo                            ;
+                      =1    41     ;                                 Include File                               ;
+                      =1    42     ;                                                                            ;
+                      =1    43     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    44     ; Interrupt Controller Definitions
+                      =1    45     
+                      =1    46     ; Addresses
+  FF22                =1    47     INTCtrlrEOI     EQU     0FF22H          ; address of interrupt controller EOI registe
+                                   r
+                      =1    48     
+                      =1    49     ; Register Values
+8086/87/88/186 MACRO ASSEMBLER    INT2                                                     14:13:30  12/04/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+  000E                =1    50     Int2EOI         EQU     000EH           ; INT2 EOI command
+  8000                =1    51     NonSpecEOI      EQU     08000H          ; Non-specific EOI command
+                            52 +1  $INCLUDE(INT2.INC )
+                      =1    53     
+                      =1    54     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    55     ;                                                                            ;
+                      =1    56     ;                                   INT2.INC                                 ;
+                      =1    57     ;                              Event Handler Demo                            ;
+                      =1    58     ;                                 Include File                               ;
+                      =1    59     ;                                                                            ;
+                      =1    60     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    61     
+                      =1    62     ; This file contains the definitions for initializing and using INT2 for 
+                      =1    63     ; event handlers
+                      =1    64     
+                      =1    65     ; INT2 Definitions
+                      =1    66     
+                      =1    67     ; Addresses
+  FF3C                =1    68     I2CON           EQU     0FF3CH       ; address of I2CON register associatd
+                      =1    69                                                                              ; with INT2 
+                      =1    70     
+                      =1    71     ; Control Register Values
+  0001                =1    72     ICON2Val     EQU     00001H          ;value to write to INT 2 Register
+                      =1    73                                             ;-----------0----  edge/level triggering
+                      =1    74                                                                                     
+                                                             ; set for edge
+                      =1    75                                                                                     
+                                                                 ; triggering
+                      =1    76                                             ;------------0---  clear to enable
+                      =1    77                                             ;                  interrupts
+                      =1    78                                             ;-------------001  define priority level
+                      =1    79     
+                      =1    80     ; Interrupt Vectors
+  000E                =1    81     Int2Vec         EQU     14               ;interrupt vector for INT2
+                      =1    82     
+                            83     
+                            84     CGROUP  GROUP   CODE
+                            85     
+----                        86     CODE SEGMENT PUBLIC 'CODE'
+                            87     
+                            88             ASSUME  CS:CGROUP
+                            89             
+                            90     
+                            91     ; InitINT2
+                            92     ;
+                            93     ; Description: Initializes I2CON interrupt control register, which 
+                            94     ; serves as a control register for non-cascadable external interrupt
+                            95     ; pins. This register needs to be set so that interrupts are allowed
+                            96     ; to occur and run the event handler.
+                            97     ; This function sets the I2CON register up with a certain trigger mode,
+                            98     ; interrupt mask, and priority level. It also sends an EOI to 
+                            99     ; clear out the controller. 
+                           100     ;
+                           101     ; Operation: This does this by writing to the address of the ICON2 
+                           102     ; register to initialize interrupts, and to the EOI register to clear
+8086/87/88/186 MACRO ASSEMBLER    INT2                                                     14:13:30  12/04/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           103     ; the in-service bit.          
+                           104     ;
+                           105     ; Arguments:         None.
+                           106     ; Return Value:      None.
+                           107     ;
+                           108     ; Local Variables:   None.
+                           109     ; Shared Variables:  None.
+                           110     ; Global Variables:  None.
+                           111     ;
+                           112     ; Input:             None.
+                           113     ; Output:            None.
+                           114     ;
+                           115     ; Error Handling:    None.
+                           116     ;
+                           117     ; Algorithms:        None.
+                           118     ; Data Structures:   None.
+                           119     ;
+                           120     ; Registers Changed: AX, DX
+                           121     ; Stack Depth:       0 words
+                           122     ;
+                           123     ; Author:            Meera Krishnamoorthy 
+                           124     ; Last Modified:     11/19/2016
+                           125     
+0000                       126     InitINT2       PROC    NEAR
+                           127     PUBLIC      InitINT2
+0000 BA3CFF                128             MOV     DX, I2CON ;sets up the interrupt control register
+0003 B001                  129             MOV     AL, ICON2Val ; moves appropriate value to it
+0005 EE                    130             OUT     DX, AL ; outputs value 
+                           131     
+0006 BA22FF                132             MOV     DX, INTCtrlrEOI ; address of EOI register
+0009 B80E00                133             MOV     AX, Int2EOI ; value to send to EOI register
+                           134                                                         ; to clear in-service bit
+000C EE                    135             OUT     DX, AL ;send an Int2 EOI (to clear out controller)
+                           136     
+000D C3                    137             RET         
+                           138     
+                           139     
+                           140     InitINT2       ENDP
+                           141     
+                           142     
+----                       143     CODE ENDS
+                           144     
+                           145     
+                           146     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

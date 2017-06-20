@@ -1,0 +1,21 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: HW51.LNK, HW52.LNK
+OUTPUT FILE: HW5.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  12/04/;6  TIME:  22:09:52
+
+
+LINK MAP OF MODULE KEYPAD
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 038FH ------    G    CODE            CODE                          
+ 003CH ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+HW51.LNK(KEYPAD)
+HW52.LNK(EH)

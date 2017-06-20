@@ -1,0 +1,564 @@
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE EH
+OBJECT MODULE PLACED IN ALLEH.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE ALLEH.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1            NAME  EH
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                    EH                                      ;
+                             5     ;                     Event Handler related functions                        ;
+                             6     ;                 used to activate serial and motor input/output             ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; Description:      This program contains functions to initialize and
+                            10     ;                   deal with the timer event handler and illegal
+                            11     ;                   event handlers for the motors and serial port
+                            12     ; Table of Contents:
+                            13     ; 1) Serial_EventHandler: calls function to deal with serial interrupts
+                            14     ;                                                 and then sends an EOI when done. 
+                            15     ; 2) Install_Serial_Handler: installs event handler for INT2 interrupt
+                            16     ; 3) PWM_EventHandler: calls function to deal with pwm events
+                            17     ; 4) Install_PWM_Handler: installs event handler for timer interrupt
+                            18     ; 5) IllegalEventHandler: event handler for illegal interrupts -- does nothing
+                            19     ;                         but send no specific EOI
+                            20     ; 6) InitCS: initializes peripheral chip selects on 80188
+                            21     ; 7) ClrIRQVectors: installs illegal event handler for all interrupts in
+                            22     ;                   interrupt vector table
+                            23     ;
+                            24     ; Input:            None.
+                            25     ; Output:           None.
+                            26     ;
+                            27     ; User Interface:   None. 
+                            28     ; Error Handling:   None.
+                            29     ;
+                            30     ; Algorithms:       None.
+                            31     ; Data Structures:  None.
+                            32     ;
+                            33     ; Revision History:
+                            34     ;      10/30/16  Meera Krishnamoorthy   used functions written by Glen George
+                            35     ;                                       to use for event handling/ timers
+                            36     
+                            37     
+                            38     ; local include files
+                            39 +1  $INCLUDE(EH.INC)
+                      =1    40     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    41     ;                                                                            ;
+                      =1    42     ;                                      EH.INC                                ;
+                      =1    43     ;                              Event Handler Demo                            ;
+                      =1    44     ;                                 Include File                               ;
+                      =1    45     ;                                                                            ;
+                      =1    46     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    47     
+                      =1    48     ; This file contains the definitions for the Event Handler Demonstration
+                      =1    49     ; program (EH.ASM)
+                      =1    50     
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+  0001                =1    51     FIRST_RESERVED_VEC      EQU     1       ;reserve vectors 1-3
+  0003                =1    52     LAST_RESERVED_VEC       EQU     3
+  0100                =1    53     NUM_IRQ_VECTORS         EQU     256     ;number of interrupt vectors
+                      =1    54     
+                      =1    55     
+                            56 +1  $INCLUDE(TIMER.INC)
+                      =1    57     
+                      =1    58     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    59     ;                                                                            ;
+                      =1    60     ;                                   TIMER.INC                                ;
+                      =1    61     ;                              Event Handler Demo                            ;
+                      =1    62     ;                                 Include File                               ;
+                      =1    63     ;                                                                            ;
+                      =1    64     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    65     
+                      =1    66     ; This file contains the definitions for intializing and using the timer for 
+                      =1    67     ; event handlers
+                      =1    68     
+                      =1    69     ; Timer Definitions
+                      =1    70     
+                      =1    71     ; Addresses
+  FF56                =1    72     Tmr0Ctrl        EQU     0FF56H          ;address of Timer 0 Control Register
+  FF52                =1    73     Tmr0MaxCntA     EQU     0FF52H          ;address of Timer 0 Max Count A Register
+  FF50                =1    74     Tmr0Count       EQU     0FF50H          ;address of Timer 0 Count Register
+                      =1    75     
+                      =1    76     ; Control Register Values
+  E001                =1    77     Tmr0CtrlVal     EQU     0E001H          ;value to write to Timer 0 Control Register
+                      =1    78                                             ;1---------------  enable timer
+                      =1    79                                             ;-1--------------  write to control
+                      =1    80                                             ;--1-------------  enable interrupts
+                      =1    81                                             ;----000000------  reserved
+                      =1    82                                             ;---0------0-----  read only
+                      =1    83                                             ;-----------0----  TMRIN0 is an enable
+                      =1    84                                             ;------------00--  count timer 2 outs
+                      =1    85                                             ;--------------0-  single counter mode
+                      =1    86                                             ;---------------1  continuous mode
+  C001                =1    87     Tmr2CtrlVal     EQU     0C001H          ;value to write to Timer 2 Control Register
+                      =1    88                                             ;1---------------  enable timer
+                      =1    89                                             ;-1--------------  write to control
+                      =1    90                                             ;--0-------------  no interrupts
+                      =1    91                                             ;----000000-0000-  reserved
+                      =1    92                                             ;---0------0-----  read only
+                      =1    93                                             ;---------------1  continuous mode
+                      =1    94     
+                      =1    95     ; Interrupt Vectors
+  0008                =1    96     Tmr0Vec         EQU     8               ;interrupt vector for Timer 0
+                      =1    97     
+                      =1    98     ; Timing Definitions
+                      =1    99     
+  0900                =1   100     COUNTS_PER_MS   EQU     2304            ;number of timer counts per 1 ms (assumes 18.
+                                   432 MHz clock)
+  0900                =1   101     MS_PER_SEG      EQU     2304             ;number of ms for each segment
+                           102 +1  $INCLUDE(IRQ.INC)
+                      =1   103     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   104     ;                                                                            ;
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   105     ;                                 INTERRUPT.INC                              ;
+                      =1   106     ;                              Event Handler Demo                            ;
+                      =1   107     ;                                 Include File                               ;
+                      =1   108     ;                                                                            ;
+                      =1   109     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   110     ; Addresses
+  FF32                =1   111     INTCtrlrCtrl    EQU     0FF32H          ;address of interrupt controller for timer
+  FF22                =1   112     INTCtrlrEOI     EQU     0FF22H          ;address of interrupt controller EOI register
+                      =1   113     
+                      =1   114     ; Register Values
+  0001                =1   115     INTCtrlrCVal    EQU     00001H          ;set priority for timers to 1 and enable
+                      =1   116                                             ;000000000000----  reserved
+                      =1   117                                             ;------------0---  enable timer interrupt
+                      =1   118                                             ;-------------001  timer priority
+  0008                =1   119     TimerEOI        EQU     00008H          ;Timer EOI command (same for all timers)
+  8000                =1   120     NonSpecEOI      EQU     08000H          ;Non-specific EOI command
+                      =1   121     
+                      =1   122     
+  000E                =1   123     Int2EOI         EQU     000EH           ; INT2 EOI command
+                           124 +1  $INCLUDE(DISPLAY.INC)
+                      =1   125     ; DISPLAY.INC
+                      =1   126     ; This file contains the constants for the functions in "display.asm", three
+                      =1   127     ; of which are used to convert decimal/hexadecimal numbers into segment patterns,
+                      =1   128     ; and two of which are used to display those segment patterns on the board
+                      =1   129     
+                      =1   130     
+                      =1   131     ; Revision History:
+                      =1   132     ;    10/30/16  Meera Krishnamoorthy wrote constants
+                      =1   133     
+  0000                =1   134     ASCII_NULL      equ 0           ;used to check if the string was terminated
+  0008                =1   135     DISPLAY_LEN     equ 8           ;the number of characters that can be displayed
+                      =1   136                                     ;on the display
+  0000                =1   137     LEDDisplay      equ 0000H       ;display address
+                           138 +1  $INCLUDE(INT2.INC)
+                      =1   139     
+                      =1   140     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   141     ;                                                                            ;
+                      =1   142     ;                                   INT2.INC                                 ;
+                      =1   143     ;                              Event Handler Demo                            ;
+                      =1   144     ;                                 Include File                               ;
+                      =1   145     ;                                                                            ;
+                      =1   146     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   147     
+                      =1   148     ; This file contains the definitions for initializing and using INT2 for 
+                      =1   149     ; event handlers
+                      =1   150     
+                      =1   151     ; INT2 Definitions
+                      =1   152     
+                      =1   153     ; Addresses
+  FF3C                =1   154     I2CON           EQU     0FF3CH       ; address of I2CON register associatd
+                      =1   155                                                                              ; with INT2 
+                      =1   156     
+                      =1   157     ; Control Register Values
+  0001                =1   158     ICON2Val     EQU     00001H          ;value to write to INT 2 Register
+                      =1   159                                             ;-----------0----  edge/level triggering
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   160                                                                                     
+                                                             ; set for edge
+                      =1   161                                                                                     
+                                                                 ; triggering
+                      =1   162                                             ;------------0---  clear to enable
+                      =1   163                                             ;                  interrupts
+                      =1   164                                             ;-------------001  define priority level
+                      =1   165     
+                      =1   166     ; Interrupt Vectors
+  000E                =1   167     Int2Vec         EQU     14               ;interrupt vector for INT2
+                      =1   168     
+                           169     
+                           170     
+                           171     CGROUP  GROUP   CODE
+                           172     
+----                       173     CODE SEGMENT PUBLIC 'CODE'
+                           174     
+                           175             ASSUME  CS:CGROUP
+                           176             EXTRN   SerialEH:NEAR
+                           177                     EXTRN   PWM_Function:NEAR
+                           178     
+                           179     ; Serial_EventHandler
+                           180     ;
+                           181     ; Description: This procedure is the event handler for each INT2 interrupt.
+                           182     ;                          It calls "SerialEH", a function defined in serial.asm
+                           183     ;                          that determines what interrupt occurred, and how to 
+                           184     ;                          proceed based on the interrupt that occurred. Finally, it 
+                                   sends 
+                           185     ;                          an EOI to the event handler and restores the registers. 
+                           186     ;
+                           187     ; Operation: First, the function puts the registers on the stack. Then, it
+                           188     ;                        calls SerialEH to determine the interrupts that occurred and
+                           189     ;                        what to do based on which interrupt occured. Finally, it sen
+                                   ds the 
+                           190     ;                    EOI to the event handler and restores the registers. 
+                           191     ;
+                           192     ; Arguments:         None.
+                           193     ; Return Value:      None.
+                           194     ;
+                           195     ; Local Variables:   None.
+                           196     ; Shared Variables:  None.
+                           197     ; Global Variables:  None.
+                           198     ;
+                           199     ; Input:             None.
+                           200     ; Output:            None.
+                           201     ;
+                           202     ; Error Handling:    None.
+                           203     ;
+                           204     ; Algorithms:        None.
+                           205     ; Data Structures:   None.
+                           206     ;
+                           207     ; Registers Changed: None
+                           208     ; Stack Depth:       4 words
+                           209     ;
+                           210     ; Author:            Meera Krishnamoorthy
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           211     ; Last modified:         11/19/16
+                           212     
+0000                       213     Serial_EventHandler       PROC    NEAR
+                           214     
+0000                       215     StartEventHandler3:
+                           216     
+0000 60                    217             PUSHA
+                           218                     
+0001 E80000         E      219     Call SerialEH     ; calls function to determine function of each motor               
+                           220     
+0004                       221     EndSerial_EventHandler:                   
+                           222     
+0004 BA22FF                223             MOV     DX, INTCtrlrEOI       ;send the EOI to the interrupt controller
+0007 B80E00                224             MOV     AX, Int2EOI
+000A EE                    225             OUT     DX, AL
+                           226     
+000B 61                    227                 POPA
+                           228                     
+                           229     
+000C CF                    230             IRET                  ;and return (Event Handlers end with IRET not RET)
+                           231     
+                           232     
+                           233     Serial_EventHandler       ENDP
+                           234     
+                           235     ; Install_Serial_Handler
+                           236     ;
+                           237     ; Description:       Install the serial event handler for the INT2 interrupt.
+                           238     ;
+                           239     ; Operation:         Writes the address of the INT2 event handler to the
+                           240     ;                    appropriate interrupt vector.
+                           241     ;
+                           242     ; Arguments:         None.
+                           243     ; Return Value:      None.
+                           244     ;
+                           245     ; Local Variables:   None.
+                           246     ; Shared Variables:  None.
+                           247     ; Global Variables:  None.
+                           248     ;
+                           249     ; Input:             None.
+                           250     ; Output:            None.
+                           251     ;
+                           252     ; Error Handling:    None.
+                           253     ;
+                           254     ; Algorithms:        None.
+                           255     ; Data Structures:   None.
+                           256     ;
+                           257     ; Registers Changed: flags, AX, ES
+                           258     ; Stack Depth:       0 words
+                           259     ;
+                           260     ; Author:            Meera Krishnamoorthy
+                           261     ; Last Modified:     11/19/2016
+                           262     
+000D                       263     Install_Serial_Handler  PROC    NEAR
+                           264     PUBLIC      Install_Serial_Handler
+                           265     
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           266     
+000D 33C0                  267             XOR     AX, AX          ;clear ES (interrupt vectors are in segment 0)
+000F 8EC0                  268             MOV     ES, AX
+                           269                                     ;store the vector
+0011 26C70638000000 R      270             MOV     ES: WORD PTR (4 * Int2Vec), OFFSET(Serial_EventHandler)
+0018 26C7063A00---- R      271             MOV     ES: WORD PTR (4 * Int2Vec + 2), SEG(Serial_EventHandler)
+                           272     
+                           273     
+001F C3                    274             RET                     ;all done, return
+                           275     
+                           276     
+                           277     Install_Serial_Handler  ENDP
+                           278     
+                           279     ; PWM_EventHandler
+                           280     ;
+                           281     ; Description: This procedure is the event handler for each timer interrupt.
+                           282     ;                          It calls "PWM_Function", a function defined in motors.asm
+                           283     ;                          that determines whether each motor should be turned on/off
+                           284     ;                          and if on, whether they should be moving forwards or back-
+                           285     ;                          wards. Finally, it sends an EOI to the event handler and r
+                                   estores 
+                           286     ;                          the register. 
+                           287     ;
+                           288     ; Operation: First, the function puts the registers on the stack. Then, it
+                           289     ;                        calls PWM_Functions to determine the function of each
+                           290     ;                        motor at each timer interrupt. Finally, it sends the EOI to 
+                                   the
+                           291     ;                        event handler and restores the registers. 
+                           292     ;
+                           293     ; Arguments:         None.
+                           294     ; Return Value:      None.
+                           295     ;
+                           296     ; Local Variables:   None.
+                           297     ; Shared Variables:  None.
+                           298     ; Global Variables:  None.
+                           299     ;
+                           300     ; Input:             None.
+                           301     ; Output:            None.
+                           302     ;
+                           303     ; Error Handling:    None.
+                           304     ;
+                           305     ; Algorithms:        None.
+                           306     ; Data Structures:   None.
+                           307     ;
+                           308     ; Registers Changed: None
+                           309     ; Stack Depth:       3 words
+                           310     ;
+                           311     ; Author:            Meera Krishnamoorthy
+                           312     ; Last modified:         11/12/16
+                           313     
+0020                       314     PWM_EventHandler       PROC    NEAR
+                           315     
+0020                       316     StartEventHandler2:
+                           317     
+0020 60                    318             PUSHA
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           319     
+0021 E80000         E      320     Call PWM_Function     ; calls function to determine function of each motor           
+                                       
+                           321     
+0024                       322     EndPWM_EventHandler:                   
+                           323     
+0024 BA22FF                324             MOV     DX, INTCtrlrEOI       ;send the EOI to the interrupt controller
+0027 B80800                325             MOV     AX, TimerEOI
+002A EE                    326             OUT     DX, AL
+                           327     
+002B 61                    328             POPA
+                           329     
+002C CF                    330             IRET                  ;and return (Event Handlers end with IRET not RET)
+                           331     
+                           332     
+                           333     PWM_EventHandler       ENDP
+                           334     
+                           335     ; Install_PWM_Handler
+                           336     ;
+                           337     ; Description:       Install the PWM event handler for the timer interrupt.
+                           338     ;
+                           339     ; Operation:         Writes the address of the timer event handler to the
+                           340     ;                    appropriate interrupt vector.
+                           341     ;
+                           342     ; Arguments:         None.
+                           343     ; Return Value:      None.
+                           344     ;
+                           345     ; Local Variables:   None.
+                           346     ; Shared Variables:  None.
+                           347     ; Global Variables:  None.
+                           348     ;
+                           349     ; Input:             None.
+                           350     ; Output:            None.
+                           351     ;
+                           352     ; Error Handling:    None.
+                           353     ;
+                           354     ; Algorithms:        None.
+                           355     ; Data Structures:   None.
+                           356     ;
+                           357     ; Registers Changed: flags, AX, ES
+                           358     ; Stack Depth:       0 words
+                           359     ;
+                           360     ; Author:            Glen George
+                           361     ; Last Modified:     Jan. 28, 2002
+                           362     
+002D                       363     Install_PWM_Handler  PROC    NEAR
+                           364     PUBLIC      Install_PWM_Handler
+                           365     
+                           366     
+002D 33C0                  367             XOR     AX, AX          ;clear ES (interrupt vectors are in segment 0)
+002F 8EC0                  368             MOV     ES, AX
+                           369                                     ;store the vector
+0031 26C70620002000 R      370             MOV     ES: WORD PTR (4 * Tmr0Vec), OFFSET(PWM_EventHandler)
+0038 26C7062200---- R      371             MOV     ES: WORD PTR (4 * Tmr0Vec + 2), SEG(PWM_EventHandler)
+                           372     
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           373     
+003F C3                    374             RET                     ;all done, return
+                           375     
+                           376     
+                           377     Install_PWM_Handler  ENDP
+                           378     
+                           379     ; IllegalEventHandler
+                           380     ;
+                           381     ; Description:       This procedure is the event handler for illegal
+                           382     ;                    (uninitialized) interrupts.  It does nothing - it just
+                           383     ;                    returns after sending a non-specific EOI.
+                           384     ;
+                           385     ; Operation:         Send a non-specific EOI and return.
+                           386     ;
+                           387     ; Arguments:         None.
+                           388     ; Return Value:      None.
+                           389     ;
+                           390     ; Local Variables:   None.
+                           391     ; Shared Variables:  None.
+                           392     ; Global Variables:  None.
+                           393     ;
+                           394     ; Input:             None.
+                           395     ; Output:            None.
+                           396     ;
+                           397     ; Error Handling:    None.
+                           398     ;
+                           399     ; Algorithms:        None.
+                           400     ; Data Structures:   None.
+                           401     ;
+                           402     ; Registers Changed: None
+                           403     ; Stack Depth:       2 words
+                           404     ;
+                           405     ; Author:            Glen George
+                           406     ; Last Modified:     Dec. 25, 2000
+                           407     
+0040                       408     IllegalEventHandler     PROC    NEAR
+                           409     PUBLIC      IllegalEventHandler
+                           410     
+0040 90                    411             NOP                             ;do nothing (can set breakpoint here)
+                           412     
+0041 60                    413             PUSHA
+                           414     
+0042 BA22FF                415             MOV     DX, INTCtrlrEOI         ;send a non-sepecific EOI to the
+0045 B80080                416             MOV     AX, NonSpecEOI          ;   interrupt controller to clear out
+0048 EE                    417             OUT     DX, AL                  ;   the interrupt that got us here
+                           418     
+0049 61                    419             POPA
+                           420     
+004A CF                    421             IRET                            ;and return
+                           422     
+                           423     
+                           424     IllegalEventHandler     ENDP
+                           425     
+                           426     
+                           427     ; ClrIRQVectors
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           428     ;
+                           429     ; Description:      This functions installs the IllegalEventHandler for all
+                           430     ;                   interrupt vectors in the interrupt vector table.  Note
+                           431     ;                   that all 256 vectors are initialized so the code must be
+                           432     ;                   located above 400H.  The initialization skips  (does not
+                           433     ;                   initialize vectors) from vectors FIRST_RESERVED_VEC to
+                           434     ;                   LAST_RESERVED_VEC.
+                           435     ;
+                           436     ; Arguments:        None.
+                           437     ; Return Value:     None.
+                           438     ;
+                           439     ; Local Variables:  CX    - vector counter.
+                           440     ;                   ES:SI - pointer to vector table.
+                           441     ; Shared Variables: None.
+                           442     ; Global Variables: None.
+                           443     ;
+                           444     ; Input:            None.
+                           445     ; Output:           None.
+                           446     ;
+                           447     ; Error Handling:   None.
+                           448     ;
+                           449     ; Algorithms:       None.
+                           450     ; Data Structures:  None.
+                           451     ;
+                           452     ; Registers Used:   flags, AX, CX, SI, ES
+                           453     ; Stack Depth:      1 word
+                           454     ;
+                           455     ; Author:           Glen George
+                           456     ; Last Modified:    Feb. 8, 2002
+                           457     
+004B                       458     ClrIRQVectors   PROC    NEAR
+                           459     PUBLIC      ClrIRQVectors
+                           460     
+004B                       461     InitClrVectorLoop:              ;setup to store the same handler 256 times
+                           462     
+004B 33C0                  463             XOR     AX, AX          ;clear ES (interrupt vectors are in segment 0)
+004D 8EC0                  464             MOV     ES, AX
+004F BE0000                465             MOV     SI, 0           ;initialize SI to skip RESERVED_VECS (4 bytes each)
+                           466     
+0052 B90001                467             MOV     CX, 256         ;up to 256 vectors to initialize
+                           468     
+                           469     
+0055                       470     ClrVectorLoop:                  ;loop clearing each vector
+                           471                                     ;check if should store the vector
+0055 83FE04                472             CMP     SI, 4 * FIRST_RESERVED_VEC
+0058 7205                  473             JB      DoStore         ;if before start of reserved field - store it
+005A 83FE0C                474             CMP     SI, 4 * LAST_RESERVED_VEC
+005D 760B                  475             JBE     DoneStore       ;if in the reserved vectors - don't store it
+                           476             ;JA     DoStore         ;otherwise past them - so do the store
+                           477     
+005F                       478     DoStore:                        ;store the vector
+005F 26C7044000     R      479             MOV     ES: WORD PTR [SI], OFFSET(IllegalEventHandler)
+0064 26C74402----   R      480             MOV     ES: WORD PTR [SI + 2], SEG(IllegalEventHandler)
+                           481     
+006A                       482     DoneStore:                      ;done storing the vector
+8086/87/88/186 MACRO ASSEMBLER    EH                                                       17:59:09  12/09/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+006A 83C604                483             ADD     SI, 4           ;update pointer to next vector
+                           484     
+006D E2E6                  485             LOOP    ClrVectorLoop   ;loop until have cleared all vectors
+                           486             ;JMP    EndClrIRQVectors;and all done
+                           487     
+                           488     
+006F                       489     EndClrIRQVectors:               ;all done, return
+006F C3                    490             RET
+                           491     
+                           492     
+                           493     ClrIRQVectors   ENDP
+                           494     
+                           495     
+----                       496     CODE ENDS
+                           497     
+                           498     
+                           499     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

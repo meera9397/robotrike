@@ -1,0 +1,90 @@
+8086/87/88/186 MACRO ASSEMBLER    MOTORBITS                                                17:58:58  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MOTORBITS
+OBJECT MODULE PLACED IN MOTORB.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MOTORB.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME  MOTORBITS
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                  MOTORBITS                                 ;
+                             6     ;                                                                            ;
+                             7     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             8     
+                             9     ; This file contains the bit patterns to tell you if the motor is on/off
+                            10     ; and the direction of the motors.
+                            11     
+                            12     ; Revision History:
+                            13     ; Meera Krishnamoorthy  11/12/16  create table
+                            14     
+                            15     
+                            16     ;setup code group and start the code segment
+                            17     CGROUP  GROUP   CODE
+                            18     
+----                        19     CODE    SEGMENT PUBLIC 'CODE'
+                            20     
+                            21     
+                            22     ; MotorOnOff
+                            23     ;
+                            24     ; Description:      This table is meant to write to bits 1, 3, 5 of Port B. 
+                            25     ;                                       Bit 1 corresponds to Motor 1, bit 3 correspon
+                                   ds to Motor 2
+                            26     ;                                       and Bit 5 corresponds to Motor 3. A '1' in th
+                                   e bit values
+                            27     ;                                       indicates that that motor is on. 
+                            28     ;
+                            29     ; Notes:            READ ONLY tables should always be in the code segment so
+                            30     ;                   that in a standalone system it will be located in the
+                            31     ;                   ROM with the code.
+                            32     ;
+                            33     ; Author:           Meera Krishnamoorthy
+                            34     ; Last Modified:    11/12/16
+                            35     
+0000                        36     MotorOnOff       LABEL   BYTE
+                            37             PUBLIC  MotorOnOff
+                            38     
+0000 02                     39     DB          00000010B        ; motor 1 is on
+0001 08                     40     DB          00001000B        ; motor 2 is on
+0002 20                     41     DB          00100000B        ; motor 3 is on
+                            42     
+                            43     ; MotorDirection
+                            44     ;
+                            45     ; Description:      This table is meant to write to bits 0, 2, 4 of Port B. 
+                            46     ;                                       Bit 0 corresponds to Motor 1, bit 2 correspon
+                                   ds to Motor 2
+                            47     ;                                       and Bit 4 corresponds to Motor 3. A '1' in th
+8086/87/88/186 MACRO ASSEMBLER    MOTORBITS                                                17:58:58  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                                   e bit values
+                            48     ;                                       indicates that that motor is moving backwards
+                                   . 
+                            49     ;
+                            50     ; Notes:            READ ONLY tables should always be in the code segment so
+                            51     ;                   that in a standalone system it will be located in the
+                            52     ;                   ROM with the code.
+                            53     ;
+                            54     ; Author:           Meera Krishnamoorthy
+                            55     ; Last Modified:    11/12/16
+0003                        56     MotorDirection       LABEL   BYTE
+                            57             PUBLIC  MotorDirection
+                            58     
+0003 01                     59     DB          00000001B        ; motor 1 is moving backwards
+0004 04                     60     DB          00000100B        ; motor 2 is moving backwards
+0005 10                     61     DB          00010000B        ; motor 3 is moving backwards
+                            62     
+                            63     
+----                        64     CODE    ENDS
+                            65     
+                            66     
+                            67     
+                            68     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

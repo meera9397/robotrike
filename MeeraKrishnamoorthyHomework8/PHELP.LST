@@ -1,0 +1,655 @@
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE PHELP
+OBJECT MODULE PLACED IN PHELP.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE PHELP.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1     NAME    PHELP
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                           Parser Helper Functions                          ;
+                             6     ;              Helper functions to aid in parsing serial input               ;
+                             7     ;                                  EE/CS 51                                  ;
+                             8     ;                                                                            ;
+                             9     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            10     
+                            11     
+                            12     ; Overall Description:
+                            13     ;
+                            14     ; Table of Contents
+                            15     ;
+                            16     ; Revision History:
+                            17     ;    11/24/16  Meera Krishnamoorthy   wrote code
+                            18     
+                            19     
+                            20     CGROUP  GROUP   CODE
+                            21     
+                            22     
+----                        23     CODE    SEGMENT PUBLIC 'CODE'
+                            24     
+                            25     
+                            26     ASSUME  CS:CGROUP
+                            27     
+                            28 +1  $INCLUDE(PARSER.INC)
+                      =1    29     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    30     ;                                                                            ;
+                      =1    31     ;                                PARSER.INC                                  ;
+                      =1    32     ;                                                                            ;
+                      =1    33     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    34     
+                      =1    35     ; This file contains the assembly language definitions for the serial command
+                      =1    36     ; parser.  Mainly these are the state and token type definitions.
+                      =1    37     ;
+                      =1    38     ; Revision History:
+                      =1    39     ;     11/24/16    Meera Krishnamoorthy          initial revision
+                      =1    40     ;
+                      =1    41     
+                      =1    42     
+                      =1    43     
+                      =1    44     ; State definitions
+                      =1    45     ;    note that these MUST match the layout of the transition table
+                      =1    46     
+  0000                =1    47     INIT                EQU 0               ; initial state
+  0001                =1    48     VALID_COMMAND       EQU 1               ; check if valid first character
+  0002                =1    49     SIGN                EQU 2               ; save sign
+  0003                =1    50     ADD_DIGIT               EQU     3               ; add digits (create number)
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;EXECUTE_COMMAND        EQU     4               ; get command to execute
+  0004                =1    52     LASER               EQU 4       ; to do if laser
+  0005                =1    53     ERROR_STATE                 EQU 5               ; state to go to if any errors
+                      =1    54     
+                      =1    55     
+  0006                =1    56     NUM_STATES              EQU     6               ; number of states
+                      =1    57     
+                      =1    58     
+                      =1    59     ; Token Type Definitions
+                      =1    60     ;    note that these MUST match the layout of the transition table
+                      =1    61     
+  0000                =1    62     TOKEN_SPEED       EQU 0
+  0001                =1    63     TOKEN_RELSPEED    EQU 1
+  0002                =1    64     TOKEN_DIR         EQU 2
+  0003                =1    65     TOKEN_TURRANG     EQU 3
+  0004                =1    66     TOKEN_ELVTURRANG  EQU 4
+  0005                =1    67     TOKEN_FIRELASER   EQU 5
+  0006                =1    68     TOKEN_OFFLASER    EQU 6
+  0007                =1    69     TOKEN_SIGN        EQU 7
+  0008                =1    70     TOKEN_DIGIT       EQU 8
+  0009                =1    71     TOKEN_CR          EQU 9
+  000A                =1    72     TOKEN_OTHER       EQU 10
+                      =1    73     
+  000B                =1    74     NUM_TOKEN_TYPES EQU     11              ;number of token types
+                      =1    75     
+                      =1    76     ; Sign-related constants
+ -0001                =1    77     NEG_SIGN_CONST         EQU -1
+  0000                =1    78     NO_SIGN_CONST          EQU 0
+  0001                =1    79     POS_SIGN_CONST         EQU 1
+                      =1    80     
+                      =1    81     ; Error related constants
+  007B                =1    82     ERROR_CONST            EQU  123 ; generic non zero value to set AX to
+                      =1    83                                     ; if there is an error
+  001D                =1    84     OVERFLOW_ERROR_CONST   EQU  29 ; random constant to indicate overflow error
+                      =1    85                                    ; occurred
+                      =1    86     
+                      =1    87     ; setting speed/ angle for motor and turret constants
+ -8000                =1    88     NO_CHANGE_ANGLE        EQU -32768
+  FFFF                =1    89     NO_CHANGE_SPEED        EQU 65535
+  003C                =1    90     TURR_ELV_BOUND         EQU 60
+                      =1    91     
+  007F                =1    92     TOKEN_MASK      EQU     01111111B       ;mask high bit of token
+                            93     
+                            94     EXTRN   SetMotorSpeed:NEAR
+                            95     EXTRN   GetMotorSpeed:NEAR
+                            96     EXTRN   GetMotorDirection:NEAR
+                            97     
+                            98     EXTRN   GetTurretAngle:NEAR
+                            99     EXTRN   SetRelTurretAngle:NEAR
+                           100     EXTRN   SetTurretAngle:NEAR
+                           101     EXTRN   SetTurretElevation:NEAR
+                           102     
+                           103     EXTRN   SetLaser:NEAR
+                           104     
+                           105     ; ChangeSpeed
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     ;
+                           107     ; Description: This function takes in three values. One, in AX, is the
+                           108     ; new speed. In BX is the command corresponding to the function (which
+                           109     ; in this case, is S). In CX is the sign of the number, which should be 0,
+                           110     ; representing that the number is unsigned. The only important value in
+                           111     ; this function is AX, the new speed. This value is checked to ensure
+                           112     ; it fits bounds, and then is set to be the new speed of the RoboTrike by
+                           113     ; calling SetMotorSpeed with the speed in AX and a value for the angle in
+                           114     ; BX that will not change the angle (since SetMotorSpeed changes both
+                           115     ; the speed and the angle).
+                           116     ;
+                           117     ; Operation: This function changes the speed of the RoboTrike, assuming
+                           118     ; the number in AX is the absolute speed. Before it calls SetMotorSpeed,
+                           119     ; a function that changes the motor speed, it ensures the speed it
+                           120     ; passes in AX (which is how SetMotorSpeed should be called) is less
+                           121     ; than the limit (called NO_CHANGE_SPEED).
+                           122     ;
+                           123     ; Operation: This is done by setting the angle to NO_CHANGE_ANGLE, so that
+                           124     ; the angle will not change while changing the speed. Then, this function
+                           125     ; calls SetMotorSpeed.
+                           126     ;
+                           127     ; Arguments: AX: number to set as speed of RoboTrike
+                           128     ;            BX: command corresponding to action about to perform
+                           129     ;            CX: sign of value in AX
+                           130     ; Return Value: None.
+                           131     ;
+                           132     ; Local Variables: None.
+                           133     ; Shared Variables: None.
+                           134     ; Global Variables: None.
+                           135     ;
+                           136     ; Input: None.
+                           137     ; Output: None.
+                           138     ;
+                           139     ; Error Handling: None.
+                           140     ;
+                           141     ; Algorithms: None.
+                           142     ; Data Structures:
+                           143     ;
+                           144     ;
+                           145     ; Registers Changed: None.
+                           146     ; Stack Depth: None.
+                           147     ;
+                           148     ; Limitations: None.
+                           149     ;
+                           150     ; Author: Meera Krishnamoorthy
+                           151     ; Last Modified: 11/24/16
+                           152     ;
+                           153     
+0000                       154     ChangeSpeed      PROC        NEAR
+                           155             PUBLIC      ChangeSpeed
+                           156     
+0000                       157     CheckSpeedLim:
+0000 3D0000                158       CMP AX, 0 ; make sure that AX is not 0
+0003 7F06                  159       JG SetNewSpeed ; if it is, set AX to be overflow_error_const
+                           160     
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0005                       161     SpeedOE:
+0005 B81D00                162       MOV AX, OVERFLOW_ERROR_CONST ; set AX to be a value representing that an
+                           163                                    ; overflow error occurred
+0008 EB0790                164       JMP EndChangeSpeed
+                           165     
+000B                       166     SetNewSpeed:
+000B BB0080                167       MOV BX, NO_CHANGE_ANGLE ; sets angle to a value so that the angle
+                           168                               ; is not changed
+000E E80000         E      169       Call SetMotorSpeed ; changes speed
+                           170     
+0011                       171     EndChangeSpeed:
+0011 C3                    172       RET
+                           173     
+                           174     ChangeSpeed     ENDP
+                           175     
+                           176     
+                           177     ; ChangeRelSpeed
+                           178     ;
+                           179     ; Description: This function takes in three values. One, in AX, is the
+                           180     ; offset of speed (the value to be added/subtracted from the old
+                           181     ; speed of the RoboTrike). In BX is the command corresponding to the function
+                           182     ; (in this case, V). In CX is the sign of the number, which will determine
+                           183     ; whether to add or subtract the offset of the speed from the old speed.
+                           184     ; The offset of the speed is added/ subtracted to the old speed, and then
+                           185     ; this value is checked to see if it overflows. If it does, AX is to
+                           186     ; show that an overflow error occurred. If there is no overflow, SetMotorSpeed
+                           187     ; is called.
+                           188     ;
+                           189     ; Operation: This function changes the speed of the RoboTrike, assuming
+                           190     ; the number in AX is the relative speed. This function adds or subtracts
+                           191     ; the passed in speed (in AX) to the original speed of the RoboTrike based
+                           192     ; the value of CX (the sign of the number). Then it compares this value
+                           193     ; to 0 and the maximum speed (NO_CHANGE_SPEED) to ensure that the speed
+                           194     ; lies within appropriate bounds (cannot be negative or too large). If
+                           195     ; the speed is within those bounds, the new speed is set to the original
+                           196     ; speed +- AX. If not, the speed is not set to a new value and AX
+                           197     ; is passed back with an error value.
+                           198     ;
+                           199     ; Arguments: None.
+                           200     ; Return Value: None.
+                           201     ;
+                           202     ; Local Variables: None.
+                           203     ; Arguments: AX: number to add/subtract to current speed of RoboTrike
+                           204     ;            BX: command corresponding to action about to perform
+                           205     ;            CX: sign of value in AX
+                           206     ;
+                           207     ; Global Variables: None.
+                           208     ;
+                           209     ; Input: None.
+                           210     ; Output: None.
+                           211     ;
+                           212     ; Error Handling: None.
+                           213     ;
+                           214     ; Algorithms: None.
+                           215     ; Data Structures: None.
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     ;
+                           217     ;
+                           218     ; Registers Changed: None.
+                           219     ; Stack Depth: None.
+                           220     ;
+                           221     ; Limitations: None.
+                           222     ;
+                           223     ; Author: Meera Krishnamoorthy
+                           224     ; Last Modified: 11/24/16
+                           225     ;
+                           226     
+0012                       227     ChangeRelSpeed      PROC        NEAR
+                           228             PUBLIC      ChangeRelSpeed
+                           229     
+                           230     
+0012                       231     GetOldSpeed:
+0012 51                    232       PUSH CX ; save sign of number
+0013 8BD0                  233       MOV DX, AX ; move addition of speed into DX
+0015 E80000         E      234       Call GetMotorSpeed ; moves old speed into AX
+0018 59                    235       POP CX  ; get back sign of number
+                           236     
+0019                       237     InitChangeRelSpeed:
+0019 83F9FF                238       CMP CX, NEG_SIGN_CONST ; check if the addition to speed should be negative
+001C 7405                  239       JE SubSpeed ; if so, subtract DX from old speed
+                           240     
+001E                       241     AddSpeed:
+001E 03C2                  242       ADD AX, DX ; if addition to speed should be positive, add DX to old speed
+0020 EB0390                243       JMP CheckRelSpeedLim ; now check that new speed value is between bounds
+                           244     
+0023                       245     SubSpeed:
+0023 2BC2                  246       SUB AX, DX ; subtract DX from old speed
+                           247     
+0025                       248     CheckRelSpeedLim:
+0025 3D0000                249       CMP AX, 0 ; make sure that speed is not less than
+                           250                 ; lower limit (0)
+0028 7D06                  251       JGE SetNewRelSpeed ; if is less than lower limit, report overflow error
+                           252                     ; if is, check next limit
+                           253     
+002A                       254     RelSpeedOE: ; reporting overflow error by setting value of AX to a certain
+                           255                 ; value
+002A B81D00                256       MOV AX, OVERFLOW_ERROR_CONST
+002D EB0790                257       JMP EndChangeRelSpeed
+                           258     
+0030                       259     SetNewRelSpeed:
+0030 BB0080                260       MOV BX, NO_CHANGE_ANGLE ; sets angle to a value so that the angle
+                           261                               ; is not changed
+0033 E80000         E      262       Call SetMotorSpeed ; changes speed
+                           263       ;MOV AX, 0 ; to make sure a non zero value isn't recorded in AX to 
+                           264                 ; make it seem like there was an overflow error
+0036                       265     EndChangeRelSpeed:
+0036 C3                    266       RET
+                           267     
+                           268     ChangeRelSpeed  ENDP
+                           269     
+                           270     
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           271     ; ChangeDir
+                           272     ;
+                           273     ; Description: This function takes in three values. One, in AX, is the
+                           274     ; offset of angle (the value to be added/subtracted from the old
+                           275     ; angle of the RoboTrike). In BX is the command corresponding to the function
+                           276     ; (in this case, D). In CX is the sign of the number, which will determine
+                           277     ; whether to add or subtract the offset of the angle from the old angle.
+                           278     ; The offset of the angle is added/ subtracted to the old angle, and then
+                           279     ; this value is checked to see if it overflows. If it does, AX is to
+                           280     ; show that an overflow error occurred. If there is no overflow, SetMotorSpeed
+                           281     ; is called (which also changes the angle).
+                           282     ;
+                           283     ; Operation: This function changes the direction of the RoboTrike, assuming
+                           284     ; the number in AX is the relative angle. This function adds or subtracts
+                           285     ; the passed in angle (in AX) to the original angle of the RoboTrike based
+                           286     ; the value of CX (the sign of the number). Then it compares this value
+                           287     ; to the minimum angle (NO_CHANGE_ANGLE) and the maximum angle NOT(NO_CHANGE_ANGLE)
+                           288     ; to ensure that the angle lies within appropriate bounds (cannot be too negative
+                           289     ; or too positive). If the angle is within those bounds, the new speed is
+                           290     ; set to the original speed +- AX. If not, the speed is not set to a new
+                           291     ; value and AX is passed back with an error value.
+                           292     ;
+                           293     ; Arguments: AX: number to add/subtract to current direction of RoboTrike
+                           294     ;            BX: command corresponding to action about to perform
+                           295     ;            CX: sign of value in AX
+                           296     ;
+                           297     ; Return Value: None.
+                           298     ;
+                           299     ; Local Variables: None.
+                           300     ; Shared Variables: None.
+                           301     ; Global Variables: None.
+                           302     ;
+                           303     ; Input: None.
+                           304     ; Output: None.
+                           305     ;
+                           306     ; Error Handling: None.
+                           307     ;
+                           308     ; Algorithms: None.
+                           309     ; Data Structures:
+                           310     ;
+                           311     ;
+                           312     ; Registers Changed: None.
+                           313     ; Stack Depth: None.
+                           314     ;
+                           315     ; Limitations: None.
+                           316     ;
+                           317     ; Author: Meera Krishnamoorthy
+                           318     ; Last Modified: 11/24/16
+                           319     ;
+                           320     
+0037                       321     ChangeDir      PROC        NEAR
+                           322             PUBLIC      ChangeDir
+                           323     
+0037                       324     GetOldDir:
+0037 51                    325       PUSH CX ; save sign of number
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0038 8BD0                  326       MOV DX, AX ; move offset of angle into DX
+003A E80000         E      327       Call GetMotorDirection ; moves old angle into AX
+003D 59                    328       POP CX  ; get back sign of offset of angle
+                           329     
+003E                       330     InitChangeDir:
+003E 83F9FF                331       CMP CX, NEG_SIGN_CONST ; check if the addition to angle should be negative
+0041 7405                  332       JE SubDir ; if so, subtract DX from old angle
+                           333     
+0043                       334     AddDir:
+0043 03C2                  335       ADD AX, DX ; if addition to angle should be positive, add DX to old angle
+0045 EB0390                336       JMP CheckDirLim1 ; check that direction value is within bounds
+                           337     
+0048                       338     SubDir:
+0048 2BC2                  339       SUB AX, DX ; subtracts DX from old angle
+                           340     
+004A                       341     CheckDirLim1:
+004A 3D0080                342       CMP AX, NO_CHANGE_ANGLE  ; make sure that angle is not less than
+                           343                                ; lower limit (NO_CHANGE_ANGLE)
+004D 7C05                  344       JL DirOE
+                           345     
+004F                       346     CheckDirLim2:
+004F 3DFF7F                347       CMP AX, NOT(NO_CHANGE_ANGLE) ; make sure that angle is not greater than
+                           348                                    ; upper limit NOT(NO_CHANGE_ANGLE)
+0052 7E06                  349       JLE SetNewDir
+                           350     
+0054                       351     DirOE: ; reporting overflow error by setting value of AX to a certain
+                           352            ; value
+0054 B81D00                353       MOV AX, OVERFLOW_ERROR_CONST
+0057 EB0C90                354       JMP EndChangeDir
+                           355     
+005A                       356     SetNewDir:
+005A 8BD8                  357       MOV BX, AX ; move angle into BX (how angle is set in SetMotorSpeed)
+005C B8FFFF                358       MOV AX, NO_CHANGE_SPEED ; sets speed to a value so that the speed
+                           359                               ; is not changed
+005F E80000         E      360       Call SetMotorSpeed ; changes angle
+0062 B80000                361       MOV AX, 0 ; to make sure a non zero value isn't recorded in AX to 
+                           362                 ; make it seem like there was an overflow error
+                           363     
+0065                       364     EndChangeDir:
+0065 C3                    365       RET
+                           366     
+                           367     
+                           368     ChangeDir       ENDP
+                           369     
+                           370     
+                           371     ; ChangeTurrAng
+                           372     ;
+                           373     ; Description: This function takes in three values. One, in AX, is the
+                           374     ; offset of angle (the value to be added/subtracted from the old
+                           375     ; angle of the turret). In BX is the command corresponding to the function
+                           376     ; (in this case, T). In CX is the sign of the number, which will determine
+                           377     ; whether to add or subtract the offset of the angle from the old angle.
+                           378     ; This function determines whether the relative angle or the
+                           379     ; absolute angle should be set based on the sign shared variable. If
+                           380     ; the relative angle is set, SetRelTurretAngle is called with AX set as the
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           381     ; relative angle. If the absolute angle is set, SetTurretAngle is called
+                           382     ; with AX as the absolute angle.
+                           383     ;
+                           384     ; Operation: This is done by checking the sign shared variable. If the
+                           385     ; sign shared variable is NEG_SIGN_CONST, that means the relative
+                           386     ; angle of the turret should be set to be - AX. If the sign shared variable is
+                           387     ; POS_SIGN_CONST,that means the relative angle of the turretshould be set to be
+                           388     ; AX. And finally, if the sign shared variable is set to NO_SIGN_CONST,
+                           389     ; that means that the absolute angle should be set to be AX.
+                           390     ;
+                           391     ; Arguments: None.
+                           392     ; Return Value: None.
+                           393     ;
+                           394     ; Local Variables: None.
+                           395     ; Shared Variables: None.
+                           396     ; Global Variables: None.
+                           397     ;
+                           398     ; Input: None.
+                           399     ; Output: None.
+                           400     ;
+                           401     ; Error Handling: None.
+                           402     ;
+                           403     ; Algorithms: None.
+                           404     ; Data Structures:
+                           405     ;
+                           406     ;
+                           407     ; Registers Changed: None.
+                           408     ; Stack Depth: None.
+                           409     ;
+                           410     ; Limitations:
+                           411     ;
+                           412     ; Author: Meera Krishnamoorthy
+                           413     ; Last Modified: 11/24/16
+                           414     ;
+                           415     
+0066                       416     ChangeTurrAng      PROC        NEAR
+                           417             PUBLIC      ChangeTurrAng
+0066                       418     InitChangeTurrAng:
+0066 83F9FF                419       CMP CX, NEG_SIGN_CONST ; check if the addition to angle should be negative
+0069 7410                  420       JE SubTurrAng ; if so, set AX to be - AX and call function to set
+                           421                     ; relative turret angle
+006B 83F901                422       CMP CX, POS_SIGN_CONST ; check if the addition to angle should be positive
+006E 7405                  423       JE AddTurrAng ; if so, can just set relative turret angle with AX as
+                           424                     ; argument, since AX is positive
+0070 83F900                425       CMP CX, NO_SIGN_CONST ; check if no sign --> means that we want to set
+                           426                             ; absolute value of turret angle
+0073 7413                  427       JE SetAbsTurrAng ; if so, call function to set absolute angle
+                           428     
+                           429     
+0075                       430     AddTurrAng:
+                           431       ; with turret angle in AX
+0075 E80000         E      432       Call SetRelTurretAngle
+0078 EB1490                433       JMP EndChangeTurrAng
+                           434     
+007B                       435     SubTurrAng:
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+007B BA0000                436       MOV DX, 0
+007E 2BD0                  437       SUB DX, AX
+0080 8BC2                  438       MOV AX, DX ; set AX = -AX
+0082 E80000         E      439       Call SetRelTurretAngle ; so that the angle is subtracted from original
+                           440                              ; angle
+0085 EB0790                441       JMP EndChangeTurrAng
+                           442     
+0088                       443     SetAbsTurrAng:
+0088 E80000         E      444       Call SetTurretAngle ; sets absolute turret angle
+008B B80000                445       MOV AX, 0 ; to make sure a non zero value isn't recorded in AX to 
+                           446                 ; make it seem like there was an overflow error
+                           447     
+008E                       448     EndChangeTurrAng:
+008E C3                    449       RET
+                           450     
+                           451     ChangeTurrAng   ENDP
+                           452     
+                           453     
+                           454     ; ChangeTurrElvAng
+                           455     ;
+                           456     ; Description: This function takes in three values. One, in AX, is the
+                           457     ; offset of elevation angle (the value to be added/subtracted from the old
+                           458     ; elevation angle of the turret). In BX is the command corresponding to the
+                           459     ; function (in this case, E). In CX is the sign of the number, which will
+                           460     ; determine if the elevation angle is negative or positive. This function checks
+                           461     ; if AX is within the appropriate bounds of turret elevation angles. If not,
+                           462     ; it sends an overflow error. If it is, this function changes the
+                           463     ; turret elevation angle, taking in to account a negative angle if the
+                           464     ; sign shared variable indicates the number is signed.
+                           465     ;
+                           466     ; Operation: This function checks if AX is greater than TURR_ELV_BOUND. If
+                           467     ; it is, then the function changes AX to indicate an overflow error
+                           468     ; has occurred. If not, then the turret elevation angle can be changed.
+                           469     ; This function then checks the sign shared variable. If it is NEG_SIGN_CONST,
+                           470     ; we make AX negative. Then we call SetTurretElevation with the elevation angle
+                           471     ; to set in AX. 
+                           472     ;
+                           473     ; Arguments: None.
+                           474     ; Return Value: None.
+                           475     ;
+                           476     ; Local Variables: None.
+                           477     ; Shared Variables: None.
+                           478     ; Global Variables: None.
+                           479     ;
+                           480     ; Input: None.
+                           481     ; Output: None.
+                           482     ;
+                           483     ; Error Handling: None.
+                           484     ;
+                           485     ; Algorithms: None.
+                           486     ; Data Structures:
+                           487     ;
+                           488     ;
+                           489     ; Registers Changed: None.
+                           490     ; Stack Depth: None.
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           491     ;
+                           492     ; Limitations:
+                           493     ;
+                           494     ; Author: Meera Krishnamoorthy
+                           495     ; Last Modified: 11/24/16
+                           496     ;
+                           497     
+008F                       498     ChangeTurrElvAng      PROC        NEAR
+                           499             PUBLIC      ChangeTurrElvAng
+                           500     
+008F                       501     InitTurrElvAng: ; ensures that AX falls within the appropriate bounds
+008F 3D3C00                502       CMP AX, TURR_ELV_BOUND
+0092 7F15                  503       JG TurrElvAngOE
+                           504     
+0094                       505     CheckSign:
+0094 83F9FF                506       CMP CX, NEG_SIGN_CONST
+0097 7507                  507       JNE SetTurrElvAng
+0099 BA0000                508       MOV DX, 0
+009C 2BD0                  509       SUB DX, AX
+009E 8BC2                  510       MOV AX, DX ; set AX = -AX
+                           511     
+00A0                       512     SetTurrElvAng:
+00A0 E80000         E      513       Call SetTurretElevation ; sets turret elevation angle to whatever is in AX
+00A3 B80000                514       MOV AX, 0 ; to make sure a non zero value isn't recorded in AX to 
+                           515                 ; make it seem like there was an overflow error
+00A6 EB0490                516       JMP EndTurrElvAng
+                           517     
+00A9                       518     TurrElvAngOE: ; reporting overflow error by setting value of AX to a certain
+                           519              ; value
+00A9 B81D00                520       MOV AX, OVERFLOW_ERROR_CONST
+                           521     
+00AC                       522     EndTurrElvAng:
+00AC C3                    523       RET
+                           524     
+                           525     ChangeTurrElvAng        ENDP
+                           526     
+                           527     
+                           528     ; ChangeLaser
+                           529     ;
+                           530     ; Description: This function sets the laser based on the value of BX (the
+                           531     ; command of the action to perform).
+                           532     ;
+                           533     ; Operation: If the command variable is TOKEN_FIRELASER, SetLaser is called
+                           534     ; with 1 in AX to turn the laser on. If the command variable is TOKEN_OFFLASER,
+                           535     ; SetLaser is called with 0 in AX to turn the laser off.
+                           536     ;
+                           537     ; Arguments: BX: sign of value in AX
+                           538     ; Return Value: None.
+                           539     ;
+                           540     ; Local Variables: None.
+                           541     ; Shared Variables: None.
+                           542     ; Global Variables: None.
+                           543     ;
+                           544     ; Input: None.
+                           545     ; Output: None.
+8086/87/88/186 MACRO ASSEMBLER    PHELP                                                    19:28:41  11/25/;6  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           546     ;
+                           547     ; Error Handling: None.
+                           548     ;
+                           549     ; Algorithms: None.
+                           550     ; Data Structures: None.
+                           551     ;
+                           552     ; Registers Changed: None.
+                           553     ; Stack Depth: None.
+                           554     ;
+                           555     ; Limitations: None.
+                           556     ;
+                           557     ; Author: Meera Krishnamoorthy
+                           558     ; Last Modified: 11/24/16
+                           559     ;
+                           560     
+00AD                       561     ChangeLaser      PROC        NEAR
+                           562             PUBLIC      ChangeLaser
+                           563     
+00AD                       564     InitChangeLaser:
+00AD D1EB                  565       SHR BX, 1 ; bx was shifted left to index call table 
+00AF 83FB05                566       CMP BX, TOKEN_FIRELASER
+00B2 7405                  567       JE FireLaser
+00B4 83FB06                568       CMP BX, TOKEN_OFFLASER
+00B7 7406                  569       JE OffLaser
+                           570     
+00B9                       571     FireLaser:
+00B9 B80100                572       MOV AX, 1
+00BC EB0490                573       JMP SetLaserStatus
+                           574     
+00BF                       575     OffLaser:
+00BF B80000                576       MOV AX, 0
+                           577     
+00C2                       578     SetLaserStatus:
+00C2 E80000         E      579       Call SetLaser
+                           580     
+00C5                       581     EndChangeLaser:
+                           582       ;MOV AX, 0 ; to make sure a non zero value isn't recorded in AX to 
+                           583                 ; make it seem like there was an overflow error
+00C5 C3                    584       RET
+                           585     
+                           586     ChangeLaser     ENDP
+                           587     
+                           588     
+                           589     
+----                       590     CODE    ENDS
+                           591     
+                           592     
+                           593     END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

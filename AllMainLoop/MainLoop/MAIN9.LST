@@ -1,0 +1,321 @@
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    18:17:36  12/09/;6  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE MAIN9
+OBJECT MODULE PLACED IN MAIN9.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE MAIN9.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME    MAIN9
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                               REMOTE MAIN LOOP                             ;
+                             6     ;                                  EE/CS  51                                 ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description: (more details in functional specification) This is the
+                            11     ; main loop for the remote (keypad/ display) unit, the keypad user interface, the
+                            12     ; serial interface, and any error handling that needs to be done in the main loop
+                            13     ; (serial port errors, key entry errors, etc.) All errors are reported
+                            14     ; to the user. In this main loop, the stack and data segment are set up, 
+                            15     ; and so are the addresses/ values related to the keypad, display, and serial
+                            16     ; port so that they can be used. Furthermore, interrupts are enabled
+                            17     ; (both timer interrupts to be used by the keypad and display, and 
+                            18     ; INT2 interrupts used by the serial port). Finally, this function
+                            19     ; initializes an EventQueue, which is used to keep track of keypad
+                            20     ; and serial events that are occurring. Then, the main
+                            21     ; loop continues to dequeue from the event queue if event exist to dequeue. 
+                            22     ; The dequeueing function includes calling a call table to call functions
+                            23     ; to deal with events that are dequeued. 
+                            24     ; 
+                            25     ; Input:            The input of this program is from the serial port
+                            26     ;                   via the motors and from the keypad.
+                            27     ; Output:           This program outputs to the display and to the serial
+                            28     ;                   port. 
+                            29     ;
+                            30     ; User Interface:   The user interface of this program is the keypad/ display.
+                            31     ;                   Users can see what commands they send to the motor
+                            32     ;                   when they press the keys over the display (they
+                            33     ;                   send commands to the motor via the key pad)
+                            34     ; Error Handling:   Display error messages for serial/parsing errors. 
+                            35     ;
+                            36     ; Algorithms:       Muxing in display. 
+                            37     ; Data Structures:  EventQueue
+                            38     ;
+                            39     ; Known Bugs:       None.
+                            40     ; Limitations:      Displaying update string right after displaying string related to
+                            41     ;                   key press. 
+                            42     ;
+                            43     ; Revision History: Meera Krishnamoorthy 12/3/16    wrote code
+                            44     ;                   Meera krishnamoorthy 12/4/15    debugged
+                            45     ;                   Meera krishnamoorthy 12/5/15    debugged/commented
+                            46     
+                            47     ;
+                            48     
+                            49     ;definitions
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    18:17:36  12/09/;6  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     CGROUP  GROUP   CODE
+                            52     DGROUP  GROUP   DATA, STACK
+                            53          
+----                        54     CODE    SEGMENT PUBLIC 'CODE'
+                            55                     ASSUME  CS:CGROUP, DS:DGROUP
+                            56     
+                            57     
+                            58 +1  $INCLUDE(MAIN9.inc)
+                      =1    59     ; MAIN9.INC
+                      =1    60     ; This contains all of the constants needed to run the remote main loop.
+                      =1    61     
+                      =1    62     ; error flags/ related values
+  007B                =1    63     CRITICAL_FLAG       EQU 123 ; this is the value that the critical flag shoul
+                      =1    64                                 ; be set to when the queue is full
+  0042                =1    65     ERROR_FLAG_VAL      EQU 66 ; this is the value our error flag is set to
+                      =1    66                                ; when there is an error
+  0006                =1    67     QUEUE_EMPTY_CONST   EQU 6  ; this is the constant that corresponds to the
+                      =1    68                                ; appropriate function to call in the RemoteTable
+                      =1    69                                ; call table when the queue is empty
+                      =1    70                                
+                      =1    71                                
+                      =1    72     
+                      =1    73     ; ASCII constants
+                      =1    74     ; These are contained in other files, but are here simply for quick
+                      =1    75     ; reference
+                      =1    76     
+  000D                =1    77     CARRIAGE_RETURN     EQU 13 ; this is the ASCII value of a carriage return.
+                      =1    78                                ; the motor unit recognizes this character
+                      =1    79                                ; as the end of a command, so when we send
+                      =1    80                                ; strings serially, they need to end with
+                      =1    81                                ; a carriage return
+                      =1    82                               
+                      =1    83     
+                      =1    84     ; constants related to size
+  000F                =1    85     MAX_KEY_PRESS       EQU 15 ; this is the maximum number of keys 
+                      =1    86                                ; in our AllKeyPresses table (all the keys we are 
+                      =1    87                                ; considering valid key presses)
+                      =1    88     
+  0400                =1    89     EVENTQUEUE_SIZE     EQU 1024 ; this is the size of our event queue
+                      =1    90     
+                      =1    91     
+                      =1    92     
+  0018                =1    93     MAX_ERROR_TABLE_VAL   EQU 24 ; this is length of the ErrorTable if the
+                      =1    94                                  ; table is a word table. since the lsr
+                      =1    95                                  ; is set (error wise) as multiples of 2
+                      =1    96                                  ; this value is used to determine
+                      =1    97                                  ; if the lsr value is within the table. 
+                      =1    98                                  
+                      =1    99     
+                      =1   100     ; the following constants are used in the KeyPress table to check
+                      =1   101     ; if a key pressed has a valid value (we are defining what
+                      =1   102     ; valid key presses are)  
+                      =1   103     ; the values (e, d, b, 7) for each key are actually related
+                      =1   104     ; to value locations read from the address 80H to 83H (the keypad) when the
+                      =1   105     ; keys are pressed. e, d, b, 7 aren't the entire values corresponding
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    18:17:36  12/09/;6  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   106     ; to the key presses, but they are the uniqe part of each key value
+                      =1   107                                
+  00E0                =1   108     KEY_PRESS_1 EQU          0E0H       ; key press corresponding to a value of 
+                      =1   109                                         ; e in row 0
+  00D0                =1   110     KEY_PRESS_2 EQU          0D0H       ; key press corresponding to a value of 
+                      =1   111                                         ; d in row 0
+  00B0                =1   112     KEY_PRESS_3 EQU          0B0H       ; key press corresponding to a value of 
+                      =1   113                                         ; b in row 0
+  0070                =1   114     KEY_PRESS_4 EQU          070H       ; key press corresponding to a value of 
+                      =1   115                                         ; 7 in row 0
+                      =1   116            
+  00E1                =1   117     KEY_PRESS_5 EQU          0E1H       ; key press corresponding to a value of 
+                      =1   118                                         ; e in row 1
+  00D1                =1   119     KEY_PRESS_6 EQU          0D1H       ; key press corresponding to a value of 
+                      =1   120                                         ; d in row 1
+  00B1                =1   121     KEY_PRESS_7 EQU          0B1H       ; key press corresponding to a value of 
+                      =1   122                                         ; b in row 1
+  0071                =1   123     KEY_PRESS_8 EQU          071H       ; key press corresponding to a value of 
+                      =1   124                                         ; 7 in row 1
+                      =1   125           
+  00E2                =1   126     KEY_PRESS_9 EQU           0E2H      ; key press corresponding to a value of 
+                      =1   127                                         ; e in row 2
+  00D2                =1   128     KEY_PRESS_10 EQU          0D2H      ; key press corresponding to a value of 
+                      =1   129                                         ; d in row 2 
+  00B2                =1   130     KEY_PRESS_11 EQU          0B2H      ; key press corresponding to a value of 
+                      =1   131                                         ; b in row 2
+  0072                =1   132     KEY_PRESS_12 EQU          072H      ; key press corresponding to a value of 
+                      =1   133                                         ; 7 in row 2
+                      =1   134           
+  00E3                =1   135     KEY_PRESS_13 EQU          0E3H      ; key press corresponding to a value of 
+                      =1   136                                         ; e in row 3 
+  00D3                =1   137     KEY_PRESS_14 EQU          0D3H      ; key press corresponding to a value of 
+                      =1   138                                         ; d in row 34 
+  00B3                =1   139     KEY_PRESS_15 EQU          0B3H      ; key press corresponding to a value of 
+                      =1   140                                         ; b in row 3
+  0073                =1   141     KEY_PRESS_16 EQU          073H      ; key press corresponding to a value of 
+                      =1   142                                         ; e in row 3
+                      =1   143     
+                           144 +1  $INCLUDE(queues.inc)
+                      =1   145     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   146     ;                                  QUEUES.INC                                ;  
+                      =1   147     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1   148     
+                      =1   149     ; This file contains constants for the functions needed to initialize and use
+                      =1   150     ; a queue (which are defined in queues.asm)
+                      =1   151     ;
+                      =1   152     ; Revision History:
+                      =1   153     ;    10/22/16  Meera Krishnamoorthy updated constants/ queue structure
+                      =1   154     
+                      =1   155     
+  0201                =1   156     queue_size equ 513 ; this variable describes the size of the queue
+  0002                =1   157     word_len equ 2 ; the size of a word is 2x the size of a bytes
+  0001                =1   158     byte_len equ 1 ; the size of a byte is set to "1"
+                      =1   159     
+                      =1   160     ; The following structure creates a queue with the following attributes:
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    18:17:36  12/09/;6  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   161     ; 1) len: the total length the queue can be
+                      =1   162     ; 2) element_size: if this variable is 0, the element size is bytes. if this
+                      =1   163     ;                  variable is 1, then the element size is words.
+                      =1   164     ; 3) front: head pointer for queue
+                      =1   165     ; 4) rear: tail pointer for queue
+                      =1   166     ; 5) elements: the array to put all elements of the queue in 
+                      =1   167     ; 
+----                  =1   168     QueueStruct         STRUC
+0000                  =1   169         len             DW      ?
+0002                  =1   170         element_size    DW      ?
+0004                  =1   171         front           DW      ?
+0006                  =1   172         rear            DW      ?
+0008                  =1   173         elements        DB      (queue_size) DUP (?)
+----                  =1   174     QueueStruct ENDS
+                           175      
+                           176     ;external function declarations
+                           177     
+                           178             EXTRN   InitCS:NEAR ; initializes chip select
+                           179             EXTRN   ClrIRQVectors:NEAR
+                           180             EXTRN   InitTimer:NEAR
+                           181             EXTRN   InitEventQueue:NEAR
+                           182             EXTRN   InitKeypad:NEAR
+                           183             EXTRN   InitSerial:NEAR
+                           184             EXTRN   InitINT2:NEAR
+                           185             EXTRN   InstallKeypadDisplayHandler:NEAR
+                           186             EXTRN   Install_Serial_Handler:NEAR
+                           187             EXTRN   DequeueEvent:NEAR
+                           188             EXTRN   InitDisplay:NEAR
+                           189             EXTRN   GetKeyPress:NEAR
+                           190             EXTRN   GetError:NEAR
+                           191             EXTRN   GetReceivedData:NEAR
+                           192             EXTRN   CheckCriticalFlag:NEAR
+                           193             
+                           194             EXTRN   InitRemoteFunct:NEAR
+0000                       195             START:
+                           196     
+0000                       197             MAIN:
+0000 FA                    198                     CLI
+0001 B8----         R      199                     MOV     AX, STACK               ;initialize the stack pointer
+0004 8ED0                  200                     MOV     SS, AX
+0006 BCE00190       R      201                     MOV     SP, OFFSET(TopOfStack)
+                           202     
+000A B8----         R      203                     MOV     AX, DGROUP                ;initialize the data segment
+000D 8ED8                  204                     MOV     DS, AX
+000F                       205             StartMainLoop:
+                           206                     ; create function to initialize buffer
+000F E80000         E      207                     CALL InitEventQueue ; creates event queue
+0012 E80000         E      208                     CALL InitCS ; initializes chip selects
+0015 E80000         E      209                     CALL ClrIRQVectors ; sets up illegal event handler
+0018 E80000         E      210                     CALL InitTimer ; initializes timer that controls
+                           211                                    ; motor and display interrupts
+001B E80000         E      212                     CALL InitINT2  ;initialize interrupts via int2
+                           213                     
+001E E80000         E      214                     CALL InitKeypad ; initializes keypad for use
+0021 E80000         E      215                     CALL InitSerial ; initializes serial port for use
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    18:17:36  12/09/;6  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0024 E80000         E      216                     CALL InitDisplay ; initializes display for use
+                           217                     
+0027 E80000         E      218                     CALL InitRemoteFunct ; sets up shared variables used in
+                           219                                          ; functions made for the remote unit
+                           220                                          ; main loop
+                           221                     
+002A E80000         E      222                     CALL InstallKeypadDisplayHandler ; installs keypad/ display
+                           223                                                      ; event handler that
+                           224                                                      ; calls functions to check
+                           225                                                      ; the keypad/ display
+                           226                                                      ; for input/ output
+                           227                                                      ; when the timer tells it to
+                           228                                                      
+002D E80000         E      229                     CALL Install_Serial_Handler ; installs the serial event handler
+0030 FB                    230                     STI ; turns on interrupts so the event handlers can run
+                           231                     
+0031                       232                     CheckRestart:
+0031 E80000         E      233                         CALL CheckCriticalFlag ; the critical flag is set if the
+                           234                                                ; event queue is full
+                           235                                                ; this function gets the value
+                           236                                                ; of the critical flag and stores it
+                           237                                                ; in AX
+0034 3D7B00                238                         CMP AX, CRITICAL_FLAG ; if AX is the value the critical
+                           239                                               ; flag is set to when 
+0037 7505                  240                         JNE GetNewElement ; if the critical flag is not set,
+                           241                                           ; then we can dequeue an element
+                           242                                           ; of the event queue, which
+                           243                                           ; will tell us what type of event
+                           244                                           ; (with what value to process)
+0039                       245                     Restart:
+0039 B80000                246                         MOV AX, 0
+003C EBD1                  247                         JMP StartMainLoop ; reinitializes everything   
+003E                       248                     GetNewElement:
+003E E80000         E      249                         CALL DequeueEvent ; dequeues element of event queue
+                           250                                           ; if the queue is not empty,
+                           251                                           ; and uses a call table to proceed
+                           252                                           ; based on event
+0041                       253                     EndMain:
+0041 EBEE                  254                         JMP CheckRestart  ; main loop continues
+                           255                                           ; loop, checking if the event queue
+                           256                                           ; is full, and if not, dequeues
+                           257                                           ; events of the queue
+                           258                         
+                           259     
+----                       260     CODE ENDS
+                           261     
+                           262     ; initialized because used later on
+----                       263     DATA    SEGMENT PUBLIC  'DATA'
+                           264        
+                           265     
+----                       266     DATA    ENDS
+                           267     
+                           268     
+                           269     ;the stack
+                           270     
+8086/87/88/186 MACRO ASSEMBLER    MAIN9                                                    18:17:36  12/09/;6  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+----                       271     STACK   SEGMENT STACK  'STACK'
+                           272     
+0000 (80                   273                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                           274     
+01E0                       275     TopOfStack      LABEL   WORD
+                           276     
+----                       277     STACK   ENDS
+                           278     
+                           279     
+                           280     
+                           281     
+                           282     END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

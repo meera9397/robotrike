@@ -1,0 +1,8 @@
+Meera Krishnamoorthy
+HW 1 #8
+
+The problem is caused because DX is not cleared before a division. The
+error occurs at address 0040:0044 with a DIV CX instruction, where AX is 
+fff9, CX is 0003, and DX is FFFF. Because DX is not cleared, when fff9
+is divided by 0003, there is overflow, and this calls the illegal
+event handler. This can be fixed by clearing DX. 
